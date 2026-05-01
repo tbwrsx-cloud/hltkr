@@ -264,7 +264,7 @@ function goalBar(label,cur,goal,unit){
   return`<div class="gbw">
     <div class="gbr">
       <span style="color:var(--muted);font-size:12px">${label}</span>
-      <span style="color:${good?"var(--accent)":"var(--warn)"};font-size:12px;font-weight:600">${cur} → ${goal} ${unit}</span>
+      <span style="color:${good?'var(--accent)':'var(--warn)'}";font-size:12px;font-weight:600">${cur} → ${goal} ${unit}</span>
     </div>
     <div class="gbt"><div class="gbf" style="width:${w}%;background:${gr}"></div></div>
   </div>`;
