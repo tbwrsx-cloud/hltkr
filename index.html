@@ -344,7 +344,7 @@ function renderLog(){
     oninput="S.log.search=this.value;reLog()" style="width:100%;margin-bottom:14px"/>
   <div>${shown.map(food=>{
     const sel=items.find(i=>i.name===food.name);
-    return`<div class="fi${sel?' on':''}" onclick="toggleFood('${food.name.replace(/'/g,"\\'")}')">
+    return`<div class="fi${sel?'  on':''}" data-name="${food.name}" onclick="toggleFood(this.dataset.name)">
       <div style="flex:1">
         <div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:3px">
           <span style="font-size:14px;font-weight:${sel?700:400}">${food.name}</span>${tagH(food)}
@@ -352,7 +352,7 @@ function renderLog(){
         <span style="color:var(--muted);font-size:11px">${food.cal} kcal · ${food.protein}g protein · ${food.portion||food.category}</span>
       </div>
       ${sel?`<input type="number" min=".5" step=".5" value="${sel.qty}"
-          onclick="event.stopPropagation()" onchange="setQty('${food.name.replace(/'/g,"\\'")}',this.value)"/>`
+          onclick="event.stopPropagation()" onchange="setQty(this.closest('[data-name]').dataset.name,this.value)"/>`
         :`<span style="color:var(--muted);font-size:22px">+</span>`}
     </div>`;}).join("")}
     ${!shown.length?`<div style="color:var(--muted);text-align:center;padding:24px">No results</div>`:''}
@@ -463,7 +463,7 @@ function renderMetrics(){
     <div style="color:var(--accent);font-weight:800;font-size:22px">Metrics Saved!</div>
     <div style="color:var(--muted);font-size:14px;text-align:center">Updated in your Drive dashboard</div>
     <div style="display:flex;gap:10px">
-      <button class="btn-sm" onclick="S.metricsDone=false;S.metrics={weight:'',hba1c:'',ldl:'',trig:''};go('metrics')">Log Again</button>
+      <button class="btn-sm" onclick="resetMetrics()">Log Again</button>
       <button class="btn-sm" onclick="go('home')">← Home</button>
     </div>
   </div>`;
@@ -527,6 +527,7 @@ async function submitLog(){
   document.getElementById("scr").innerHTML=renderLogDone();
 }
 
+function resetMetrics(){S.metricsDone=false;S.metrics={weight:"",hba1c:"",ldl:"",trig:""};go("metrics");}
 function resetLog(){S.log={meal:"Breakfast",items:[],search:""};S.logDone=false;S.logResult=null;reLog();}
 
 async function submitMetrics(){
