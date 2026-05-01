@@ -109,6 +109,10 @@ input[type=number]{width:58px;text-align:center;padding:6px 8px;border-radius:8p
   margin-bottom:16px;color:var(--warn);font-size:13px;line-height:1.7;}
 .setup code{background:var(--surface);border-radius:6px;padding:2px 7px;font-size:11px;color:var(--accent);}
 </style>
+<script>
+// Defined in <head> so nav buttons can always call go() safely
+function go(s){ if(typeof _go==="function") _go(s); else window._qNav=s; }
+</script>
 </head>
 <body>
 <div id="app">
@@ -122,9 +126,6 @@ input[type=number]{width:58px;text-align:center;padding:6px 8px;border-radius:8p
   </nav>
 </div>
 <script>
-// Safe nav wrapper - go() is available immediately, queues until app ready
-function go(s){ if(typeof _go==="function") _go(s); else window._qNav=s; }
-
 let API = localStorage.getItem('ht_api_url') || '';
 // ---
 
@@ -834,5 +835,148 @@ function loadPlanIntoSlots(){
   });
   reLog();
 }
+// ── Chart builders ───────────────────────────────────────────
+const CG="#1E2A45",CT="#6B7A9F";
+const cOpts={responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false}},
+  scales:{x:{grid:{color:CG},ticks:{color:CT,font:{size:9},maxRotation:0}},
+          y:{grid:{color:CG},ticks:{color:CT,font:{size:9}}}}};
 
+function getActuals(){return(S.dash?.actuals||[]).filter(a=>a.kcalIn>0);}
 
+function killCharts(){Object.values(S.charts).forEach(c=>{try{c.destroy()}catch(e){}});S.charts={};}
+
+function buildSparkline(){
+  const ctx=document.getElementById("sparkChart");if(!ctx)return;
+  const a=getActuals();
+  S.charts.spark=new Chart(ctx,{type:"line",data:{
+    labels:a.map(d=>d.date.slice(0,5)),
+    datasets:[{data:a.map(d=>d.kcalIn),borderColor:"#00E5A0",
+      backgroundColor:"rgba(0,229,160,0.07)",borderWidth:2,pointRadius:0,fill:true,tension:0.4}]
+  },options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{enabled:false}},
+    scales:{x:{display:false},y:{display:false}}}});
+}
+function buildCalChart(){
+  const ctx=document.getElementById("calChart");if(!ctx)return;
+  const a=getActuals();
+  S.charts.cal=new Chart(ctx,{type:"line",data:{
+    labels:a.map(d=>d.date.slice(0,5)),
+    datasets:[{label:"kcal",data:a.map(d=>d.kcalIn),borderColor:"#00E5A0",
+      backgroundColor:"rgba(0,229,160,0.08)",borderWidth:2.5,
+      pointRadius:3,pointBackgroundColor:"#00E5A0",fill:true,tension:0.4}]
+  },options:{...cOpts}});
+}
+function buildProtChart(){
+  const ctx=document.getElementById("protChart");if(!ctx)return;
+  const a=getActuals();
+  S.charts.prot=new Chart(ctx,{type:"line",data:{
+    labels:a.map(d=>d.date.slice(0,5)),
+    datasets:[{label:"protein (g)",data:a.map(d=>d.protein),borderColor:"#4A9FFF",
+      backgroundColor:"rgba(74,159,255,0.08)",borderWidth:2.5,
+      pointRadius:3,pointBackgroundColor:"#4A9FFF",fill:true,tension:0.4}]
+  },options:{...cOpts}});
+}
+function buildBarChart(){
+  const ctx=document.getElementById("barChart");if(!ctx)return;
+  const a=getActuals();
+  S.charts.bar=new Chart(ctx,{type:"bar",data:{
+    labels:a.map(d=>d.date.slice(0,5)),
+    datasets:[
+      {label:"kcal",data:a.map(d=>d.kcalIn),backgroundColor:"rgba(0,229,160,0.7)",borderRadius:4},
+      {label:"protein (g)",data:a.map(d=>d.protein),backgroundColor:"rgba(74,159,255,0.7)",borderRadius:4},
+    ]
+  },options:{...cOpts,plugins:{legend:{labels:{color:CT,font:{size:10}}}}}});
+}
+
+// ── App Init ─────────────────────────────────────────────────
+(function(){
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+  s.async=true;
+  s.onload=function(){
+    if(!API) showSetupPopup();
+    else _go(window._qNav||'home');
+  };
+  s.onerror=function(){
+    if(!API) showSetupPopup();
+    else _go(window._qNav||'home');
+  };
+  document.head.appendChild(s);
+})();
+
+// Inject font non-blocking
+(function(){
+  var l=document.createElement('link');
+  l.rel='stylesheet';
+  l.href='https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap';
+  document.head.appendChild(l);
+})();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+
+<!-- Setup Popup -->
+<div id="setup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);
+  z-index:999;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:#161D2F;border:1px solid #1E2A45;border-radius:24px;
+    padding:28px 24px;width:100%;max-width:390px;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <div style="font-size:36px;text-align:center;margin-bottom:16px">&#9881;&#65039;</div>
+    <div style="font-size:20px;font-weight:800;color:#F0F4FF;text-align:center;margin-bottom:8px">
+      Connect Your Drive</div>
+    <div style="font-size:13px;color:#6B7A9F;text-align:center;line-height:1.6;margin-bottom:24px">
+      Paste your Google Apps Script Web App URL below.<br/>
+      <span style="color:#00E5A0">script.google.com</span> &rarr; Deploy &rarr; Web App &rarr; Copy URL
+    </div>
+    <input id="api-url-input" type="url"
+      placeholder="https://script.google.com/macros/s/..."
+      style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid #1E2A45;
+        background:#111827;color:#F0F4FF;font-size:13px;font-family:inherit;
+        outline:none;margin-bottom:8px"
+      onkeydown="if(event.key==='Enter')saveApiUrl()"/>
+    <div id="url-error" style="color:#FF4757;font-size:12px;margin-bottom:12px;display:none">
+      Please enter a valid Apps Script URL</div>
+    <button onclick="saveApiUrl()" style="width:100%;padding:15px;border-radius:14px;border:none;
+      background:linear-gradient(135deg,#00E5A0,#00C98A);color:#0A0F1E;font-weight:800;
+      font-size:15px;cursor:pointer;font-family:inherit;margin-bottom:12px">
+      Connect &rarr;
+    </button>
+    <button onclick="skipSetup()" style="width:100%;padding:12px;border-radius:14px;border:none;
+      background:transparent;color:#6B7A9F;font-size:13px;cursor:pointer;font-family:inherit">
+      Skip &mdash; use sample data
+    </button>
+  </div>
+</div>
+
+<script>
+function showSetupPopup(){
+  var el=document.getElementById('setup-overlay');
+  el.style.display='flex';
+  setTimeout(function(){document.getElementById('api-url-input').focus();},100);
+}
+function saveApiUrl(){
+  var val=document.getElementById('api-url-input').value.trim();
+  var err=document.getElementById('url-error');
+  if(!val||!val.startsWith('https://script.google.com')){
+    err.style.display='block'; return;
+  }
+  err.style.display='none';
+  API=val;
+  localStorage.setItem('ht_api_url',val);
+  document.getElementById('setup-overlay').style.display='none';
+  _go('home');
+}
+function skipSetup(){
+  document.getElementById('setup-overlay').style.display='none';
+  _go('home');
+}
+function resetApiUrl(){
+  localStorage.removeItem('ht_api_url');
+  API='';
+  showSetupPopup();
+}
+</script>
+</body>
+</html>
