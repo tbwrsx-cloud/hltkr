@@ -179,6 +179,7 @@ const greet=()=>{const h=new Date().getHours();return h<12?"Good Morning":h<17?"
 const dayStr=()=>new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
 const todayKey=()=>new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});
 const dayName=()=>new Date().toLocaleDateString("en-GB",{weekday:"long"});
+const getDay=(s)=>{try{const p=s.split('/');return new Date(+p[2],+p[1]-1,+p[0]).toLocaleDateString("en-GB",{weekday:"long"});}catch(e){return dayName();}};
 const ld=()=>`<div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
 
 async function api(action,body){
@@ -871,7 +872,6 @@ async function submitLog(){
   const validItems=items.filter(Boolean);if(!validItems.length) return;
   const totalCal=Math.round(validItems.reduce((s,i)=>s+i.cal*i.qty,0));
   const totalProtein=Math.round(validItems.reduce((s,i)=>s+i.protein*i.qty,0));
-  const totalCal2=totalCal;
   document.getElementById("scr").innerHTML=`<div style="padding:calc(100px + var(--safe-t)) 16px;text-align:center">
     ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">Writing to Drive…</div>
     <div style="color:var(--muted);font-size:13px;margin-top:6px">Updating Plan&amp;Rec + Dashboard</div></div>`;
@@ -879,7 +879,7 @@ async function submitLog(){
   if(isSetup()){
     result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};
   } else {
-    try{result=await api("logMeal",{date:todayKey(),dayName:dayName(),mealType:meal,
+    try{result=await api("logMeal",{date:S.log.date,dayName:getDay(S.log.date),mealType:meal,
       items:validItems.map(i=>({food:i.name,qty:i.qty,cal:i.cal,protein:i.protein})),totalCal,totalProtein});}
     catch(e){result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};}
   }

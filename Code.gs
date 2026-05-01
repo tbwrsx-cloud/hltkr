@@ -168,16 +168,13 @@ function getToday() {
 
 
 // ── GET /plan ─────────────────────────────────────────────────
-// Returns Plan&Rec rows grouped by date for today + next 30 days
-// Each date has up to 4 meals: Breakfast, Lunch, Dinner, Snack
-// Each meal has up to 4 food items with quantities
 function getPlan() {
-  const wb = SpreadsheetApp.openById(FILE_ID);
-  const sh = wb.getSheetByName(SHEET_PLAN);
+  const wb  = SpreadsheetApp.openById(FILE_ID);
+  const sh  = wb.getSheetByName(SHEET_PLAN);
   const rows = sh.getDataRange().getValues();
 
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const now     = new Date();
+  const today   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const horizon = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
 
   const byDate = {};
@@ -186,19 +183,20 @@ function getPlan() {
     const r = rows[i];
     if (!r[0]) continue;
 
-    const dateStr = formatSheetDate(r[0]);
-    if (!dateStr) continue;
-    // Check date range
     const dp = parseSheetDate(r[0]);
     if (!dp) continue;
+
     const dNorm = new Date(dp.getFullYear(), dp.getMonth(), dp.getDate());
     if (dNorm < today || dNorm > horizon) continue;
+
+    const dateStr = formatSheetDate(r[0]);
+    if (!dateStr) continue;
 
     if (!byDate[dateStr]) {
       byDate[dateStr] = {
         date:    dateStr,
         dayName: String(r[1] || '').trim(),
-        ts:      d.getTime(),
+        ts:      dNorm.getTime(),
         meals:   {}
       };
     }
@@ -206,15 +204,14 @@ function getPlan() {
     const mealType = String(r[2] || '').trim();
     if (!mealType) continue;
 
-    // Collect up to 4 food+qty pairs (cols 3-10)
     const items = [];
     for (let c = 3; c <= 9; c += 2) {
       const food = r[c];
       const qty  = r[c + 1];
-      if (food && food !== 0 && String(food).trim() !== '') {
+      if (food && food !== 0 && String(food).trim() !== '' && String(food).trim() !== 'Food Item') {
         items.push({
           food: String(food).trim(),
-          qty:  (qty && qty !== '' && !isNaN(qty)) ? Number(qty) : 1
+          qty:  (qty && qty !== '' && !isNaN(Number(qty))) ? Number(qty) : 1
         });
       }
     }
@@ -227,7 +224,6 @@ function getPlan() {
     };
   }
 
-  // Convert to array sorted by date, convert meals object to array
   const sorted = Object.values(byDate)
     .sort((a, b) => a.ts - b.ts)
     .map(day => ({
@@ -297,7 +293,14 @@ function logMeal(body) {
 
   // ── 1. Append to Plan&Rec ──────────────────────────────────
   // Format: date | day | mealType | food1 | qty1 | food2 | qty2 | food3 | qty3 | food4 | qty4 | mealCal | dailyCal | mealProt | dailyProt
-  const row = [date, dayName, mealType,
+  // Convert DD/MM/YYYY string to Date object for Sheets
+  const dateParts = date.split('/');
+  const dateObj = new Date(
+    parseInt(dateParts[2]),
+    parseInt(dateParts[1]) - 1,
+    parseInt(dateParts[0])
+  );
+  const row = [dateObj, dayName, mealType,
     items[0]?.food||"", items[0]?.qty||"",
     items[1]?.food||"", items[1]?.qty||"",
     items[2]?.food||"", items[2]?.qty||"",
@@ -308,7 +311,7 @@ function logMeal(body) {
 
   // ── 2. Recalculate today's daily totals ───────────────────
   const allRows   = planSh.getDataRange().getValues();
-  const todayRows = allRows.filter(r => formatDate(r[0]) === date);
+  const todayRows = allRows.filter(r => formatSheetDate(r[0]) === date);
   const dayKcal   = todayRows.reduce((s, r) => s + (Number(r[11]) || 0), 0);
   const dayProt   = todayRows.reduce((s, r) => s + (Number(r[13]) || 0), 0);
 
@@ -436,17 +439,6 @@ function dateMatches(sheetVal, ddmmyyyy) {
   return formatSheetDate(sheetVal) === ddmmyyyy;
 }
 
-function formatDate(val) {
-  if (!val) return "";
-  let d;
-  if (val instanceof Date) {
-    d = val;
-  } else if (typeof val === "number") {
-    // Excel serial date
-    d = new Date(Math.round((val - 25569) * 86400 * 1000));
-  } else {
-    d = new Date(val);
-  }
   if (isNaN(d)) return String(val);
   return d.toLocaleDateString("en-GB", { day:"2-digit", month:"2-digit", year:"numeric" });
 }
