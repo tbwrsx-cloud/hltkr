@@ -50,6 +50,7 @@ function route(e) {
     if (action === "foods")     return getFoods();
     if (action === "history")   return getHistory();
     if (action === "plan")      return getPlan();
+    if (action === "plan")      return getPlan();
     if (action === "addFood")   return addFood(body);
     return { status: "HealthTrack API running ✓" };
   }
@@ -135,105 +136,28 @@ function getToday() {
   const sh   = wb.getSheetByName(SHEET_PLAN);
   const rows = sh.getDataRange().getValues();
   const todayStr = formatSheetDate(new Date());
-  const meals = [];
+  const logged = {};
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const rowDate = formatSheetDate(r[0]);
-    if (rowDate !== todayStr) continue;
-
-    // Col: 0=date,1=day,2=mealType,3=food1,4=qty1,5=food2,6=qty2,7=food3,8=qty3,9=food4,10=qty4
-    // 11=mealCal, 12=dailyCal, 13=mealProt, 14=dailyProt
-    const items = [];
-    for (let c = 3; c <= 9; c += 2) {
-      if (r[c]) items.push({ food: r[c], qty: r[c+1] || 1 });
-    }
-    meals.push({
-      mealType: r[2],
-      items,
-      mealCal:  r[11] || 0,
-      dailyCal: r[12] || null,
-      mealProt: r[13] || 0,
-      dailyProt:r[14] || null,
-    });
-  }
-
-  const totalKcal = meals.reduce((s, m) => s + (m.dailyCal || m.mealCal), 0);
-  // Use the last dailyCal found as total
-  const dailyKcal  = meals.filter(m => m.dailyCal).slice(-1)[0]?.dailyCal || meals.reduce((s,m)=>s+m.mealCal,0);
-  const dailyProt  = meals.filter(m => m.dailyProt).slice(-1)[0]?.dailyProt || meals.reduce((s,m)=>s+m.mealProt,0);
-
-  return { date: todayStr, meals, dailyKcal, dailyProt };
-}
-
-
-// ── GET /plan ─────────────────────────────────────────────────
-function getPlan() {
-  const wb  = SpreadsheetApp.openById(FILE_ID);
-  const sh  = wb.getSheetByName(SHEET_PLAN);
-  const rows = sh.getDataRange().getValues();
-
-  const now     = new Date();
-  const today   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const horizon = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-  const byDate = {};
-
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
-    if (!r[0]) continue;
-
-    const dp = parseSheetDate(r[0]);
-    if (!dp) continue;
-
-    const dNorm = new Date(dp.getFullYear(), dp.getMonth(), dp.getDate());
-    if (dNorm < today || dNorm > horizon) continue;
-
-    const dateStr = formatSheetDate(r[0]);
-    if (!dateStr) continue;
-
-    if (!byDate[dateStr]) {
-      byDate[dateStr] = {
-        date:    dateStr,
-        dayName: String(r[1] || '').trim(),
-        ts:      dNorm.getTime(),
-        meals:   {}
-      };
-    }
-
+    if (!r[0] || formatSheetDate(r[0]) !== todayStr) continue;
     const mealType = String(r[2] || '').trim();
     if (!mealType) continue;
-
-    const items = [];
-    for (let c = 3; c <= 9; c += 2) {
-      const food = r[c];
-      const qty  = r[c + 1];
-      if (food && food !== 0 && String(food).trim() !== '' && String(food).trim() !== 'Food Item') {
-        items.push({
-          food: String(food).trim(),
-          qty:  (qty && qty !== '' && !isNaN(Number(qty))) ? Number(qty) : 1
-        });
-      }
-    }
-
-    byDate[dateStr].meals[mealType] = {
-      mealType: mealType,
-      items:    items,
-      mealCal:  Number(r[11]) || 0,
+    const mealCal = Number(r[11]) || 0;
+    if (mealCal <= 0) continue; // skip unlogged planned rows
+    logged[mealType] = {
+      mealType,
+      mealCal,
       mealProt: Number(r[13]) || 0,
+      dailyCal: Number(r[12]) || null,
+      dailyProt: Number(r[14]) || null,
     };
   }
 
-  const sorted = Object.values(byDate)
-    .sort((a, b) => a.ts - b.ts)
-    .map(day => ({
-      date:    day.date,
-      dayName: day.dayName,
-      meals:   ['Breakfast','Lunch','Dinner','Snack']
-               .map(mt => day.meals[mt] || { mealType: mt, items: [], mealCal: 0, mealProt: 0 })
-    }));
-
-  return { plan: sorted };
+  const meals = Object.values(logged);
+  const dailyKcal = meals.reduce((s, m) => s + m.mealCal, 0);
+  const dailyProt = meals.reduce((s, m) => s + m.mealProt, 0);
+  return { date: todayStr, meals, dailyKcal, dailyProt };
 }
 
 // ── GET /history ──────────────────────────────────────────────
@@ -256,6 +180,61 @@ function getHistory() {
   }
 
   return { history: Object.values(byDate).slice(-30) };
+}
+
+// ── GET /plan ─────────────────────────────────────────────────
+// Returns ALL Plan&Rec rows - no date restriction
+function getPlan() {
+  const wb   = SpreadsheetApp.openById(FILE_ID);
+  const sh   = wb.getSheetByName(SHEET_PLAN);
+  const rows = sh.getDataRange().getValues();
+  const byDate = {};
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r[0]) continue;
+    const dp = parseSheetDate(r[0]);
+    if (!dp) continue;
+    const dateStr = formatSheetDate(r[0]);
+    if (!dateStr) continue;
+    const mealType = String(r[2] || '').trim();
+    if (!mealType || mealType === 'Meal Type') continue;
+
+    if (!byDate[dateStr]) {
+      byDate[dateStr] = {
+        date: dateStr,
+        dayName: String(r[1] || '').trim(),
+        ts: new Date(dp.getFullYear(), dp.getMonth(), dp.getDate()).getTime(),
+        meals: {}
+      };
+    }
+
+    const items = [];
+    for (let c = 3; c <= 9; c += 2) {
+      const food = r[c], qty = r[c + 1];
+      const fs = food ? String(food).trim() : '';
+      if (fs && fs !== 'Food Item' && fs !== 'food item') {
+        items.push({ food: fs, qty: (qty && !isNaN(Number(qty)) && Number(qty) > 0) ? Number(qty) : 1 });
+      }
+    }
+    if (items.length > 0 || Number(r[11]) > 0) {
+      byDate[dateStr].meals[mealType] = {
+        mealType, items,
+        mealCal: Number(r[11]) || 0,
+        mealProt: Number(r[13]) || 0
+      };
+    }
+  }
+
+  const sorted = Object.values(byDate)
+    .sort((a, b) => a.ts - b.ts)
+    .map(day => ({
+      date: day.date, dayName: day.dayName,
+      meals: ['Breakfast','Lunch','Dinner','Snack']
+        .map(mt => day.meals[mt] || { mealType: mt, items: [], mealCal: 0, mealProt: 0 })
+    }));
+
+  return { plan: sorted };
 }
 
 // ── GET /foods ────────────────────────────────────────────────
@@ -283,68 +262,55 @@ function getFoods() {
 }
 
 // ── POST /logMeal ─────────────────────────────────────────────
-// Body: { date, dayName, mealType, items:[{food,qty,cal,protein}], totalCal, totalProtein }
 function logMeal(body) {
-  const wb      = SpreadsheetApp.openById(FILE_ID);
-  const planSh  = wb.getSheetByName(SHEET_PLAN);
-  const dashSh  = wb.getSheetByName(SHEET_DASHBOARD);
-
+  const wb     = SpreadsheetApp.openById(FILE_ID);
+  const planSh = wb.getSheetByName(SHEET_PLAN);
+  const dashSh = wb.getSheetByName(SHEET_DASHBOARD);
   const { date, dayName, mealType, items, totalCal, totalProtein } = body;
 
-  // ── 1. Append to Plan&Rec ──────────────────────────────────
-  // Format: date | day | mealType | food1 | qty1 | food2 | qty2 | food3 | qty3 | food4 | qty4 | mealCal | dailyCal | mealProt | dailyProt
-  // Convert DD/MM/YYYY string to Date object for Sheets
-  const dateParts = date.split('/');
-  const dateObj = new Date(
-    parseInt(dateParts[2]),
-    parseInt(dateParts[1]) - 1,
-    parseInt(dateParts[0])
-  );
-  const row = [dateObj, dayName, mealType,
-    items[0]?.food||"", items[0]?.qty||"",
-    items[1]?.food||"", items[1]?.qty||"",
-    items[2]?.food||"", items[2]?.qty||"",
-    items[3]?.food||"", items[3]?.qty||"",
-    totalCal, "", totalProtein, ""
-  ];
-  planSh.appendRow(row);
+  // Convert DD/MM/YYYY to Date object
+  const dp = date.split('/');
+  const dateObj = new Date(parseInt(dp[2]), parseInt(dp[1]) - 1, parseInt(dp[0]));
 
-  // ── 2. Recalculate today's daily totals ───────────────────
-  const allRows   = planSh.getDataRange().getValues();
-  const todayRows = allRows.filter(r => formatSheetDate(r[0]) === date);
-  const dayKcal   = todayRows.reduce((s, r) => s + (Number(r[11]) || 0), 0);
-  const dayProt   = todayRows.reduce((s, r) => s + (Number(r[13]) || 0), 0);
+  // Append logged row
+  planSh.appendRow([
+    dateObj, dayName, mealType,
+    items[0] ? items[0].food : '', items[0] ? items[0].qty : '',
+    items[1] ? items[1].food : '', items[1] ? items[1].qty : '',
+    items[2] ? items[2].food : '', items[2] ? items[2].qty : '',
+    items[3] ? items[3].food : '', items[3] ? items[3].qty : '',
+    totalCal, '', totalProtein, ''
+  ]);
 
-  // Update the last snack row's dailyCal and dailyProt columns (cols 12,14 = 1-indexed 13,15)
-  const lastPlanRow = planSh.getLastRow();
-  planSh.getRange(lastPlanRow, 13).setValue(dayKcal);
-  planSh.getRange(lastPlanRow, 15).setValue(dayProt);
+  // Recalculate day totals - deduplicate by mealType (keep highest cal entry)
+  const allRows = planSh.getDataRange().getValues();
+  const byMeal = {};
+  allRows.forEach(r => {
+    if (formatSheetDate(r[0]) === date && Number(r[11]) > 0) {
+      byMeal[String(r[2]).trim()] = r;
+    }
+  });
+  const dayKcal = Object.values(byMeal).reduce((s, r) => s + (Number(r[11]) || 0), 0);
+  const dayProt = Object.values(byMeal).reduce((s, r) => s + (Number(r[13]) || 0), 0);
 
-  // ── 3. Update Dashboard ───────────────────────────────────
+  // Write daily totals to last row
+  const lastRow = planSh.getLastRow();
+  planSh.getRange(lastRow, 13).setValue(dayKcal);
+  planSh.getRange(lastRow, 15).setValue(dayProt);
+
+  // Update Dashboard
   const dashRows = dashSh.getDataRange().getValues();
-  for (let i = 2; i < dashRows.length; i++) {
-    const cellDate = formatSheetDate(dashRows[i][1]);
-    if (cellDate === date) {
-      dashSh.getRange(i + 1, 4).setValue(dayKcal);    // col D = kCal-In
-      dashSh.getRange(i + 1, 5).setValue(dayProt);    // col E = Daily Protein
+  for (let i = 1; i < dashRows.length; i++) {
+    if (formatSheetDate(dashRows[i][1]) === date) {
+      dashSh.getRange(i + 1, 4).setValue(dayKcal);
+      dashSh.getRange(i + 1, 5).setValue(dayProt);
       break;
     }
   }
 
-  return {
-    success: true,
-    date,
-    mealType,
-    totalCal,
-    totalProtein,
-    dayKcal,
-    dayProt,
-    message: `${mealType} logged: ${totalCal} kcal, ${totalProtein}g protein. Day total: ${dayKcal} kcal, ${dayProt}g protein.`
-  };
+  return { success: true, date, mealType, totalCal, totalProtein, dayKcal, dayProt };
 }
 
-// ── POST /logMetrics ──────────────────────────────────────────
-// Body: { date, weight, hba1c, ldl, trig }
 function logMetrics(body) {
   const wb     = SpreadsheetApp.openById(FILE_ID);
   const dashSh = wb.getSheetByName(SHEET_DASHBOARD);
@@ -439,6 +405,3 @@ function dateMatches(sheetVal, ddmmyyyy) {
   return formatSheetDate(sheetVal) === ddmmyyyy;
 }
 
-  if (isNaN(d)) return String(val);
-  return d.toLocaleDateString("en-GB", { day:"2-digit", month:"2-digit", year:"numeric" });
-}

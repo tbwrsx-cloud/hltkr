@@ -344,6 +344,7 @@ function renderHome(){
 function renderLog(){
   if(S.logDone) return renderLogDone();
   const{meal,items,date}=S.log;
+  const locked=isPastDate(date);
   const foods=S.foods?.foods||FOOD_DB_LOCAL;
   const plan=S.plan?.plan||[];
 
@@ -358,9 +359,11 @@ function renderLog(){
   // Build food options for dropdowns:
   // Breakfast/Lunch/Dinner: category foods + Anytime foods
   // Snack: only Snack category
-  const mealFoods = meal==='Snack'
-    ? foods.filter(f=>f.category==='Snack')
-    : foods.filter(f=>f.category===meal||f.category==='Anytime');
+  // Show all foods in dropdown - relevant category first, then rest
+  const mealFoods = [
+    ...foods.filter(f=>f.category===meal||f.category==='Anytime'),
+    ...foods.filter(f=>f.category!==meal&&f.category!=='Anytime')
+  ];
 
   // Build 4 dropdown slots - pre-fill from plan if available
   const slots = [0,1,2,3].map(i=>{
@@ -402,6 +405,12 @@ function renderLog(){
     </div>
   </div>
 
+  <!-- Past date lock -->
+  ${isPast(date)?`<div style="background:rgba(255,184,48,0.1);border:1px solid rgba(255,184,48,0.3);
+    border-radius:14px;padding:10px 14px;margin-bottom:14px;color:var(--warn);font-size:12px">
+    &#128274; Past date &mdash; viewing plan only, logging disabled
+  </div>`:''}
+
   <!-- Plan reference -->
   ${planMeal&&planMeal.items.length?`
   <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);
@@ -422,22 +431,27 @@ function renderLog(){
   </div>`}
 
   <!-- 4 Food Dropdown Slots -->
+  ${locked?`<div style="background:rgba(255,184,48,0.08);border:1px solid rgba(255,184,48,0.3);
+    border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+    <span style="font-size:16px">&#128274;</span>
+    <span style="color:var(--warn);font-size:12px;font-weight:600">Past date &mdash; view only. Editing disabled.</span>
+  </div>`:''}
   <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px">SELECT ITEMS (UP TO 4)</div>
   ${[0,1,2,3].map(i=>{
     const sl=slots[i];
     const fd=sl.selected?foods.find(f=>f.name===sl.selected):null;
     return`<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <div style="flex:1">
-        <select onchange="setSlotFood(${i},this.value)"
+        <select onchange="setSlotFood(${i},this.value)" ${locked?"disabled":""}
           style="width:100%;padding:11px 12px;border-radius:12px;
             border:1px solid ${sl.selected?'var(--accent)':'var(--border)'};
             background:var(--card);color:${sl.selected?'var(--text)':'var(--muted)'};
             font-family:inherit;font-size:13px;outline:none">
           ${blankOpt}${mealFoods.map(f=>`<option value="${f.name}" ${sl.selected===f.name?'selected':''}>${f.name} (${f.cal} kcal)</option>`).join('')}
         </select>
-        ${fd?`<div style="color:var(--muted);font-size:10px;margin-top:3px;padding-left:4px">
-          ${fd.cal} kcal &middot; ${fd.protein}g protein &middot; ${fd.portion||''}
-        </div>`:''}
+        <div id="slot-info-${i}" style="color:var(--muted);font-size:10px;margin-top:3px;padding-left:4px;display:${sl.selected?'block':'none'}">
+          ${fd?(fd.cal+' kcal &middot; '+fd.protein+'g protein &middot; '+(fd.portion||'')):''}
+        </div>
       </div>
       ${sl.selected?`<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
         <div style="color:var(--muted);font-size:9px;letter-spacing:1px">QTY</div>
@@ -451,6 +465,7 @@ function renderLog(){
   }).join('')}
 
   <!-- Summary -->
+  <div id="log-summary">
   ${items.filter(Boolean).length?`
   <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
     padding:14px;margin-top:8px;margin-bottom:80px">
@@ -467,15 +482,16 @@ function renderLog(){
   </div>`:''}
   </div>
 
-  ${items.filter(Boolean).length?`<div class="logbar">
-    <div>
-      <div style="color:var(--accent);font-weight:800;font-size:18px">${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g</div>
-      <div style="color:var(--muted);font-size:11px">${meal} &mdash; ${date.slice(0,5)}</div>
-    </div>
-    <button onclick="submitLog()" style="background:var(--accent);border:none;border-radius:12px;
-      padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit">
-      Save &#8594;</button>
-  </div>`:''}`;
+  ${(function(){
+    if(!items.filter(Boolean).length) return "";
+    const saveBtn=locked
+      ?"<span style=\"color:var(--warn);font-size:12px;font-weight:600\">&#128274; Past date</span>"
+      :"<button onclick=\"submitLog()\" style=\"background:var(--accent);border:none;border-radius:12px;padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit\">Save &#8594;</button>";
+    return "<div class=\"logbar\"><div>"
+      +"<div style=\"color:var(--accent);font-weight:800;font-size:18px\">"+fmt(totCal)+" kcal &middot; "+Math.round(totPro)+"g</div>"
+      +"<div style=\"color:var(--muted);font-size:11px\">"+meal+" &mdash; "+date.slice(0,5)+"</div>"
+      +"</div>"+saveBtn+"</div>";
+  })()}`;
 }
 function renderLogDone(){
   const r=S.logResult;
@@ -735,6 +751,13 @@ function addPlannedItem(name){
 }
 
 // Convert DD/MM/YYYY to YYYY-MM-DD for date input
+function isPast(ddmmyyyy){
+  const p=ddmmyyyy.split('/');
+  if(p.length!==3) return false;
+  const d=new Date(+p[2],+p[1]-1,+p[0]);
+  const t=new Date(); t.setHours(0,0,0,0);
+  return d<t;
+}
 function dateToISO(ddmmyyyy){
   const p=ddmmyyyy.split('/');
   if(p.length===3){
@@ -758,6 +781,14 @@ function onDateChange(isoVal){
   reLog();
 }
 
+function isPastDate(ddmmyyyy){
+  const p=ddmmyyyy.split('/');
+  if(p.length!==3) return false;
+  const d=new Date(+p[2],+p[1]-1,+p[0]);
+  const t=new Date(); t.setHours(0,0,0,0);
+  return d < t;
+}
+
 function setSlotFood(idx, name){
   const foods=S.foods?.foods||FOOD_DB_LOCAL;
   if(!S.log.items) S.log.items=[null,null,null,null];
@@ -765,14 +796,59 @@ function setSlotFood(idx, name){
   if(!name){
     S.log.items[idx]=null;
   } else {
-    const food=foods.find(f=>f.name===name);
+    const n=name.trim().toLowerCase();
+    const food=foods.find(f=>f.name.trim().toLowerCase()===n);
     if(food){
       const qty=S.log.items[idx]?.qty||1;
       S.log.items[idx]={...food,qty};
+    } else {
+      // Food not in DB (from plan) - create minimal entry
+      S.log.items[idx]={name,cal:0,protein:0,category:'',portion:'',qty:S.log.items[idx]?.qty||1};
     }
   }
-  reLog();
+  updateSummary();
 }
+
+function updateSummary(){
+  // Update just the summary and logbar without full re-render
+  const items=S.log.items||[];
+  const valid=items.filter(Boolean);
+  const totCal=valid.reduce((s,i)=>s+i.cal*i.qty,0);
+  const totPro=valid.reduce((s,i)=>s+i.protein*i.qty,0);
+  const sumEl=document.getElementById('log-summary');
+  const barEl=document.getElementById('log-bar');
+  if(sumEl){
+    sumEl.innerHTML=valid.length?`
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:8px;margin-bottom:80px">
+      <div style="color:var(--muted);font-size:10px;letter-spacing:1.5px;margin-bottom:8px">SUMMARY</div>
+      ${valid.map(i=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text);font-size:13px">${i.name} x${i.qty}</span>
+        <span style="color:var(--accent);font-size:13px;font-weight:600">${Math.round(i.cal*i.qty)} kcal</span>
+      </div>`).join('')}
+      <div style="display:flex;justify-content:space-between;padding:8px 0 0">
+        <span style="color:var(--text);font-weight:700">Total</span>
+        <span style="color:var(--accent);font-weight:800;font-size:16px">${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g P</span>
+      </div>
+    </div>`:'';
+  }
+  if(barEl){
+    barEl.style.display=valid.length?'flex':'none';
+    if(valid.length){
+      barEl.querySelector('.bar-kcal').textContent=fmt(totCal)+' kcal · '+Math.round(totPro)+'g';
+    }
+  }
+  // Update slot info rows
+  (S.log.items||[]).forEach((item,i)=>{
+    const infoEl=document.getElementById('slot-info-'+i);
+    if(infoEl&&item){
+      infoEl.textContent=item.cal+' kcal · '+item.protein+'g protein · '+(item.portion||'');
+      infoEl.style.display='block';
+    } else if(infoEl){
+      infoEl.style.display='none';
+    }
+  });
+}
+
 
 function setSlotQty(idx, val){
   if(S.log.items[idx]) S.log.items[idx].qty=parseFloat(val)||1;
@@ -791,7 +867,7 @@ function loadPlanIntoSlots(){
   const foods=S.foods?.foods||FOOD_DB_LOCAL;
   S.log.items=[null,null,null,null];
   planMeal.items.slice(0,4).forEach((pi,i)=>{
-    const food=foods.find(f=>f.name.toLowerCase()===pi.food.toLowerCase())
+    const food=foods.find(f=>f.name.trim().toLowerCase()===pi.food.trim().toLowerCase())
       ||{name:pi.food,cal:0,protein:0,category:meal,portion:'1 serving'};
     S.log.items[i]={...food,qty:pi.qty||1};
   });
