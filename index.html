@@ -122,6 +122,9 @@ input[type=number]{width:58px;text-align:center;padding:6px 8px;border-radius:8p
   </nav>
 </div>
 <script>
+// Safe nav wrapper - go() is available immediately, queues until app ready
+function go(s){ if(typeof _go==="function") _go(s); else window._qNav=s; }
+
 let API = localStorage.getItem('ht_api_url') || '';
 // ---
 
@@ -278,7 +281,7 @@ function goalBar(label,cur,goal,unit){
 
 function killCharts(){Object.values(S.charts).forEach(c=>{try{c.destroy()}catch(e){}});S.charts={};}
 
-async function go(screen){
+async function _go(screen){
   S.screen=screen;
   document.querySelectorAll(".nb").forEach(b=>b.classList.toggle("on",b.dataset.s===screen));
   killCharts();
