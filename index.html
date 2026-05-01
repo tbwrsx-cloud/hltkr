@@ -163,8 +163,8 @@ const FOOD_DB_LOCAL=[
 ];
 
 let S={
-  screen:"home",dash:null,foods:null,today:null,
-  log:{meal:"Breakfast",items:[],search:""},
+  screen:"home",dash:null,foods:null,today:null,plan:null,
+  log:{meal:"Breakfast",items:[],search:"",date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})},
   logDone:false,logResult:null,
   foodFilter:"All",
   metrics:{weight:"",hba1c:"",ldl:"",trig:""},
@@ -219,6 +219,13 @@ async function loadFoods(){
   if(isSetup()){S.foods={foods:FOOD_DB_LOCAL};return;}
   const d=await api("foods");
   S.foods=(d&&!d.error)?d:{foods:FOOD_DB_LOCAL};
+}
+
+async function loadPlan(){
+  if(S.plan) return;
+  if(isSetup()){S.plan={plan:[]};return;}
+  const d=await api("plan");
+  S.plan=(d&&!d.error)?d:{plan:[]};
 }
 async function loadToday(){
   if(S.today) return;
@@ -276,7 +283,7 @@ async function go(screen){
   const el=document.getElementById("scr");
   el.innerHTML=ld(); el.scrollTop=0;
   if(screen==="home"){await Promise.all([loadDash(),loadToday()]);el.innerHTML=renderHome();requestAnimationFrame(buildSparkline);}
-  else if(screen==="log"){await loadFoods();el.innerHTML=renderLog();}
+  else if(screen==="log"){await Promise.all([loadFoods(),loadPlan()]);el.innerHTML=renderLog();}
   else if(screen==="trends"){await loadDash();el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();});}
   else if(screen==="foods"){await loadFoods();el.innerHTML=renderFoods();}
   else if(screen==="metrics"){el.innerHTML=renderMetrics();}
@@ -309,7 +316,11 @@ function renderHome(){
         <span style="color:var(--text);font-size:12px">${fmt(m.mealCal)} kcal · ${m.mealProt}g protein</span>
       </div>`).join("")}</div>`:""}
   </div>
-  <button class="btn fu" onclick="go('log')" style="margin-bottom:14px">✚  Log a Meal</button>
+  ${isSetup() ? `<button onclick="showSetupPopup()" style="width:100%;padding:13px;border-radius:14px;
+    border:1px solid #00E5A0;background:rgba(0,229,160,0.08);color:#00E5A0;font-weight:700;
+    font-size:14px;font-family:inherit;cursor:pointer;margin-bottom:14px">
+    &#128279; Connect to Drive</button>` : ''}
+  <button class="btn fu" onclick="go('log')" style="margin-bottom:14px">&#10010;  Log a Meal</button>
   <div class="card fu">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <span class="ct">Calorie Trend</span>
@@ -330,45 +341,118 @@ function renderHome(){
 
 function renderLog(){
   if(S.logDone) return renderLogDone();
-  const{meal,items,search}=S.log;
+  const{meal,items,search,date}=S.log;
   const foods=S.foods?.foods||FOOD_DB_LOCAL;
-  const shown=search?foods.filter(f=>f.name.toLowerCase().includes(search.toLowerCase())).slice(0,16)
+  const plan=S.plan?.plan||[];
+
+  // Build date options: today + next 6 days
+  const dateOpts=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(); d.setDate(d.getDate()+i);
+    const key=d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const label=i===0?'Today':i===1?'Tomorrow':d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+    dateOpts.push({key,label});
+  }
+
+  // Find plan for selected date
+  const planDay=plan.find(p=>p.date===date);
+  const planMeals=planDay?.meals||[];
+  const planForMeal=planMeals.find(m=>m.mealType===meal);
+
+  const shown=search
+    ?foods.filter(f=>f.name.toLowerCase().includes(search.toLowerCase())).slice(0,16)
     :foods.filter(f=>f.category===meal).slice(0,16);
+
   const totCal=items.reduce((s,i)=>s+i.cal*i.qty,0);
   const totPro=items.reduce((s,i)=>s+i.protein*i.qty,0);
+
   return`<div class="pad">
-  <div style="font-size:22px;font-weight:800;margin-bottom:20px">Log Meal</div>
-  <div class="prow">${["Breakfast","Lunch","Dinner","Snack"].map(m=>
-    `<button class="pill${meal===m?' on':''}" onclick="setMeal('${m}')">${m}</button>`).join("")}</div>
-  <input type="text" placeholder="🔍 Search food..." value="${search}"
+  <div style="font-size:22px;font-weight:800;margin-bottom:16px">Log Meal</div>
+
+  <!-- Date selector -->
+  <div style="margin-bottom:16px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:8px">SELECT DATE</div>
+    <div class="prow">
+      ${dateOpts.map(o=>`<button class="pill${date===o.key?' on':''}"
+        onclick="S.log.date='${o.key}';reLog()">${o.label}</button>`).join('')}
+    </div>
+  </div>
+
+  <!-- Plan for this date/meal -->
+  ${planDay?`<div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);
+    border-radius:14px;padding:12px 14px;margin-bottom:14px">
+    <div style="color:var(--accent);font-size:10px;letter-spacing:2px;margin-bottom:8px">PLANNED FOR ${planDay.dayName.toUpperCase()} ${date.slice(0,5)}</div>
+    ${planMeals.length?planMeals.map(m=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;
+      border-bottom:1px solid rgba(30,42,69,0.5);cursor:pointer"
+      onclick="selectMeal('${m.mealType}')">
+      <div>
+        <span style="color:${meal===m.mealType?'var(--accent)':'var(--text)'};font-size:13px;font-weight:${meal===m.mealType?700:400}">${m.mealType}</span>
+        <span style="color:var(--muted);font-size:11px;margin-left:8px">${m.items.map(i=>i.food).join(', ').slice(0,40)}${m.items.length>2?'...':''}</span>
+      </div>
+      <span style="color:var(--accent);font-size:12px;font-weight:600">${m.mealCal} kcal</span>
+    </div>`).join(''):`<div style="color:var(--muted);font-size:12px">No meals planned for this day yet</div>`}
+  </div>`:`<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:10px 14px;margin-bottom:14px;color:var(--muted);font-size:12px">
+    No plan found for ${date.slice(0,5)} &mdash; log freely below
+  </div>`}
+
+  <!-- Planned items quick-add -->
+  ${planForMeal&&planForMeal.items.length?`<div style="margin-bottom:12px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:8px">PLANNED ITEMS &mdash; TAP TO ADD</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${planForMeal.items.map(pi=>{
+        const fd=foods.find(f=>f.name.toLowerCase()===pi.food.toLowerCase());
+        const sel=items.find(i=>i.name===pi.food);
+        return`<button onclick="addPlannedItem('${pi.food}')"
+          style="padding:6px 12px;border-radius:99px;border:1px solid ${sel?'var(--accent)':'var(--border)'};
+          background:${sel?'var(--adim)':'var(--card)'};color:${sel?'var(--accent)':'var(--muted)'};
+          font-size:12px;cursor:pointer;font-family:inherit">
+          ${sel?'✓ ':'+'}${pi.food}${fd?` (${fd.cal})`:''}
+        </button>`;
+      }).join('')}
+    </div>
+  </div>`:''}
+
+  <!-- Meal type pills -->
+  <div class="prow">
+    ${["Breakfast","Lunch","Dinner","Snack"].map(m=>`<button class="pill${meal===m?' on':''}"
+      onclick="setMeal('${m}')">${m}</button>`).join('')}
+  </div>
+
+  <!-- Search -->
+  <input type="text" placeholder="Search food..." value="${search}"
     oninput="S.log.search=this.value;reLog()" style="width:100%;margin-bottom:14px"/>
+
+  <!-- Food list -->
   <div>${shown.map(food=>{
     const sel=items.find(i=>i.name===food.name);
-    return`<div class="fi${sel?'  on':''}" data-name="${food.name}" onclick="toggleFood(this.dataset.name)">
+    return`<div class="fi${sel?' on':''}" data-name="${food.name}" onclick="toggleFood(this.dataset.name)">
       <div style="flex:1">
         <div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:3px">
           <span style="font-size:14px;font-weight:${sel?700:400}">${food.name}</span>${tagH(food)}
         </div>
-        <span style="color:var(--muted);font-size:11px">${food.cal} kcal · ${food.protein}g protein · ${food.portion||food.category}</span>
+        <span style="color:var(--muted);font-size:11px">${food.cal} kcal &middot; ${food.protein}g protein &middot; ${food.portion||food.category}</span>
       </div>
       ${sel?`<input type="number" min=".5" step=".5" value="${sel.qty}"
-          onclick="event.stopPropagation()" onchange="setQty(this.closest('[data-name]').dataset.name,this.value)"/>`
+          onclick="event.stopPropagation()"
+          onchange="setQty(this.closest('[data-name]').dataset.name,this.value)"/>`
         :`<span style="color:var(--muted);font-size:22px">+</span>`}
-    </div>`;}).join("")}
+    </div>`;}).join('')}
     ${!shown.length?`<div style="color:var(--muted);text-align:center;padding:24px">No results</div>`:''}
-    ${!items.length?`<div style="color:var(--muted);text-align:center;padding:24px;font-size:13px">Tap items to add them</div>`:''}
-  </div></div>
+    ${!items.length?`<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">Tap planned items above or search below</div>`:''}
+  </div>
+  </div>
   ${items.length?`<div class="logbar">
     <div>
-      <div style="color:var(--accent);font-weight:800;font-size:18px">${fmt(totCal)} kcal · ${Math.round(totPro)}g</div>
-      <div style="color:var(--muted);font-size:11px">${items.length} item${items.length>1?'s':''}</div>
+      <div style="color:var(--accent);font-weight:800;font-size:18px">${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g</div>
+      <div style="color:var(--muted);font-size:11px">${items.length} item${items.length>1?'s':''} &mdash; ${date.slice(0,5)}</div>
     </div>
     <button onclick="submitLog()" style="background:var(--accent);border:none;border-radius:12px;
-      padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;cursor:pointer;font-family:'Sora',sans-serif">
-      Save →</button>
-  </div>`:""}`;
+      padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit">
+      Save &#8594;</button>
+  </div>`:''}`;
 }
-
 function renderLogDone(){
   const r=S.logResult;
   return`<div style="padding:calc(60px + var(--safe-t)) 16px;display:flex;flex-direction:column;align-items:center;gap:20px">
@@ -438,10 +522,124 @@ function renderFoods(){
   const cats=["All","Breakfast","Lunch","Dinner","Snack"];
   const foods=S.foods?.foods||FOOD_DB_LOCAL;
   const shown=S.foodFilter==="All"?foods:foods.filter(f=>f.category===S.foodFilter);
+  const af=S.addFood;
+
+  const addFormHTML = af.show ? `
+  <div style="background:var(--card);border:1px solid var(--accent);border-radius:18px;
+    padding:18px;margin-bottom:16px">
+    <div style="color:var(--accent);font-size:12px;font-weight:700;letter-spacing:1px;margin-bottom:14px">
+      NEW FOOD ITEM</div>
+
+    ${af.error?`<div style="background:rgba(255,71,87,0.12);border:1px solid rgba(255,71,87,0.3);
+      border-radius:10px;padding:10px 12px;color:#FF4757;font-size:12px;margin-bottom:12px">${af.error}</div>`:''}
+    ${af.done?`<div style="background:var(--adim);border:1px solid var(--accent);
+      border-radius:10px;padding:10px 12px;color:var(--accent);font-size:12px;margin-bottom:12px">
+      Added successfully to kCal-DB</div>`:''}
+
+    <div style="margin-bottom:10px">
+      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">FOOD NAME *</div>
+      <input type="text" placeholder="e.g. Paneer Tikka"
+        value="${af.name}" oninput="S.addFood.name=this.value"
+        style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+          background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;outline:none"/>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">CATEGORY</div>
+        <select oninput="S.addFood.category=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none">
+          ${["Breakfast","Lunch","Dinner","Snack"].map(c=>
+            `<option value="${c}" ${af.category===c?"selected":""}>${c}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">PORTION</div>
+        <input type="text" placeholder="e.g. 100g"
+          value="${af.portion}" oninput="S.addFood.portion=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none"/>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">CALORIES *</div>
+        <input type="number" placeholder="0"
+          value="${af.cal}" oninput="S.addFood.cal=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;
+            font-weight:700;outline:none;text-align:left"/>
+      </div>
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">PROTEIN (g) *</div>
+        <input type="number" placeholder="0" step="0.5"
+          value="${af.protein}" oninput="S.addFood.protein=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;
+            font-weight:700;outline:none;text-align:left"/>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">GLYCEMIC</div>
+        <select oninput="S.addFood.glycemic=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none">
+          <option value="" ${af.glycemic===""?"selected":""}>Unknown</option>
+          <option value="Low" ${af.glycemic==="Low"?"selected":""}>Low GI</option>
+          <option value="High" ${af.glycemic==="High"?"selected":""}>High GI</option>
+        </select>
+      </div>
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">REMARK</div>
+        <select oninput="S.addFood.remark=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none">
+          <option value="" ${af.remark===""?"selected":""}>None</option>
+          <option value="Dense Calorie" ${af.remark==="Dense Calorie"?"selected":""}>Dense Calorie</option>
+          <option value="Glycemic" ${af.remark==="Glycemic"?"selected":""}>Glycemic</option>
+          <option value="Fat" ${af.remark==="Fat"?"selected":""}>Fat</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button onclick="submitAddFood()" ${af.saving?"disabled":""}
+        style="flex:1;padding:13px;border-radius:12px;border:none;
+          background:linear-gradient(135deg,var(--accent),#00C98A);
+          color:#0A0F1E;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit">
+        ${af.saving?"Saving...":"Save to Drive"}
+      </button>
+      <button onclick="S.addFood.show=false;S.addFood.done=false;S.addFood.error='';reFoods()"
+        style="padding:13px 18px;border-radius:12px;border:1px solid var(--border);
+          background:var(--surface);color:var(--muted);font-size:14px;cursor:pointer;font-family:inherit">
+        Cancel
+      </button>
+    </div>
+  </div>` : "";
+
   return`<div class="pad">
-  <div style="font-size:22px;font-weight:800;margin-bottom:4px">Food Database</div>
-  <div style="color:var(--muted);font-size:12px;margin-bottom:16px">${foods.length} items from your Drive</div>
-  <div class="prow">${cats.map(c=>`<button class="pill${S.foodFilter===c?' on':''}" onclick="setFF('${c}')">${c}</button>`).join("")}</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <div style="font-size:22px;font-weight:800">Food Database</div>
+    <button onclick="toggleAddFood()"
+      style="padding:8px 16px;border-radius:99px;border:none;cursor:pointer;font-family:inherit;
+        font-size:13px;font-weight:700;
+        background:${af.show?'var(--card)':'var(--accent)'};
+        color:${af.show?'var(--muted)':'#0A0F1E'}">
+      ${af.show?"Cancel":"+ Add Food"}
+    </button>
+  </div>
+  <div style="color:var(--muted);font-size:12px;margin-bottom:16px">${foods.length} items &mdash; synced from Drive</div>
+
+  ${addFormHTML}
+
+  <div class="prow">
+    ${cats.map(c=>`<button class="pill${S.foodFilter===c?" on":""}" onclick="setFF('${c}')">${c}</button>`).join("")}
+  </div>
+
   ${shown.map(f=>`<div class="fi" style="cursor:default">
     <div style="flex:1">
       <div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:4px">
@@ -456,7 +654,6 @@ function renderFoods(){
   </div>`).join("")}
   </div>`;
 }
-
 function renderMetrics(){
   if(S.metricsDone) return`<div style="padding:calc(80px + var(--safe-t)) 16px;display:flex;flex-direction:column;align-items:center;gap:20px">
     <div class="pop" style="font-size:64px">📊</div>
@@ -493,7 +690,75 @@ function renderMetrics(){
 }
 
 // ── Actions ───────────────────────────────────────────────────
+
+function selectMeal(m){ S.log.meal=m; reLog(); }
+
+function addPlannedItem(name){
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  const food=foods.find(f=>f.name.toLowerCase()===name.toLowerCase())
+    || {name,cal:0,protein:0,category:"Snack",portion:"1 serving"};
+  const idx=S.log.items.findIndex(i=>i.name===name);
+  if(idx>=0) S.log.items.splice(idx,1);
+  else S.log.items.push({...food,qty:1});
+  reLog();
+}
 function setMeal(m){S.log.meal=m;S.log.search="";reLog();}
+
+function reFoods(){ document.getElementById("scr").innerHTML=renderFoods(); }
+
+function toggleAddFood(){
+  S.addFood.show=!S.addFood.show;
+  S.addFood.done=false;
+  S.addFood.error="";
+  reFoods();
+}
+
+async function submitAddFood(){
+  const af=S.addFood;
+  if(!af.name.trim()){af.error="Food name is required";reFoods();return;}
+  if(!af.cal){af.error="Calories are required";reFoods();return;}
+  if(!af.protein && af.protein!==0){af.error="Protein is required";reFoods();return;}
+
+  S.addFood.saving=true; S.addFood.error=""; reFoods();
+
+  const body={
+    category: af.category,
+    name:     af.name.trim(),
+    portion:  af.portion.trim()||"1 serving",
+    cal:      parseFloat(af.cal)||0,
+    protein:  parseFloat(af.protein)||0,
+    glycemic: af.glycemic,
+    remark:   af.remark,
+  };
+
+  if(isSetup()){
+    // Offline: add to local list only
+    if(!S.foods) S.foods={foods:[...FOOD_DB_LOCAL]};
+    S.foods.foods.push(body);
+    S.addFood={show:true,name:"",category:"Snack",portion:"1 serving",
+      cal:"",protein:"",glycemic:"",remark:"",saving:false,error:"",done:true};
+    reFoods();
+    return;
+  }
+
+  try{
+    const result=await api("addFood",body);
+    if(result&&result.success){
+      // Add to local cache immediately
+      if(!S.foods) S.foods={foods:[...FOOD_DB_LOCAL]};
+      S.foods.foods.push(result.food);
+      S.addFood={show:true,name:"",category:"Snack",portion:"1 serving",
+        cal:"",protein:"",glycemic:"",remark:"",saving:false,error:"",done:true};
+    } else {
+      S.addFood.saving=false;
+      S.addFood.error=result?.error||"Failed to save. Try again.";
+    }
+  } catch(e){
+    S.addFood.saving=false;
+    S.addFood.error="Network error. Check connection.";
+  }
+  reFoods();
+}
 function setFF(f){S.foodFilter=f;document.getElementById("scr").innerHTML=renderFoods();}
 function reLog(){document.getElementById("scr").innerHTML=renderLog();}
 
@@ -523,12 +788,12 @@ async function submitLog(){
       items:items.map(i=>({food:i.name,qty:i.qty,cal:i.cal,protein:i.protein})),totalCal,totalProtein});}
     catch(e){result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};}
   }
-  S.logResult=result; S.logDone=true; S.today=null;
+  S.logResult=result; S.logDone=true; S.today=null; S.plan=null;
   document.getElementById("scr").innerHTML=renderLogDone();
 }
 
 function resetMetrics(){S.metricsDone=false;S.metrics={weight:"",hba1c:"",ldl:"",trig:""};go("metrics");}
-function resetLog(){S.log={meal:"Breakfast",items:[],search:""};S.logDone=false;S.logResult=null;reLog();}
+function resetLog(){const d=S.log.date;S.log={meal:"Breakfast",items:[],search:"",date:d};S.logDone=false;S.logResult=null;reLog();}
 
 async function submitMetrics(){
   const{weight,hba1c,ldl,trig}=S.metrics;
