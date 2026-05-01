@@ -7,7 +7,7 @@
 //       Copy the Web App URL into index.html
 // ============================================================
 
-const FILE_ID = "1FQUkfpoA2cQxeCgL0GCtquks3aRHaPh6";
+const FILE_ID = "15T-6RNCGzIQVpEmnPnRa7eYGtrxZ4HG9PsTtLJ1wZvA";
 const SHEET_DASHBOARD = "Dashboard";
 const SHEET_PLAN      = "Plan&Rec";
 const SHEET_KCAL_DB   = "kCal-DB";
@@ -32,6 +32,13 @@ function respond(data, code) {
   return output;
 }
 
+// Handle preflight OPTIONS request for CORS
+function doOptions(e) {
+  return ContentService
+    .createTextOutput("")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
 // ── Router ────────────────────────────────────────────────────
 function route(e) {
   const action = (e.parameter && e.parameter.action) || "";
@@ -42,6 +49,8 @@ function route(e) {
     if (action === "today")     return getToday();
     if (action === "foods")     return getFoods();
     if (action === "history")   return getHistory();
+    if (action === "plan")      return getPlan();
+    if (action === "addFood")   return addFood(body);
     return { status: "HealthTrack API running ✓" };
   }
 
@@ -60,43 +69,62 @@ function getDashboard() {
   const sh = wb.getSheetByName(SHEET_DASHBOARD);
   const rows = sh.getDataRange().getValues();
 
-  // Row 2 = headers, Row 3+ = data (0-indexed: row[1]=headers, row[2+]=data)
   const actuals = [];
   const goals   = [];
+  let current   = { weight: null, hba1c: null, ldl: null, trig: null };
+  let foundFirst = false;
 
-  for (let i = 2; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
+
+    // Parse date from col B (index 1)
     const dateVal = r[1];
-    if (!dateVal) continue;
+    if (!dateVal || dateVal === 'Date' || dateVal === '') continue;
 
-    const dateStr = formatDate(dateVal);
-    const kcalOut = r[2] || 0;
-    const kcalIn  = r[3] || 0;
-    const protein = r[4] || 0;
+    const dateStr = formatSheetDate(dateVal);
+    if (!dateStr) continue;
 
+    const kcalOut = Number(r[2]) || 0;
+    const kcalIn  = Number(r[3]) || 0;
+    const protein = Number(r[4]) || 0;
+
+    // Only include rows that have calorie data logged
     if (kcalIn > 0 || protein > 0) {
       actuals.push({ date: dateStr, kcalOut, kcalIn, protein });
     }
 
-    // Goals columns: Year(12), Weight(13), HbA1c(14), LDL(15), Trig(16)
+    // Biomarkers — cols H,I,J,K (indices 7,8,9,10)
+    const w = r[7], h = r[8], l = r[9], t = r[10];
+    if (w || h || l || t) {
+      if (!foundFirst) {
+        current = {
+          weight: Number(w) || null,
+          hba1c:  Number(h) || null,
+          ldl:    Number(l) || null,
+          trig:   Number(t) || null
+        };
+        foundFirst = true;
+      }
+    }
+
+    // Goals — cols M,N,O,P,Q (indices 12,13,14,15,16)
     if (r[12]) {
       goals.push({
-        year:   r[12],
-        weight: r[13],
-        hba1c:  r[14],
-        ldl:    r[15],
-        trig:   r[16],
+        year:   String(r[12]),
+        weight: Number(r[13]) || null,
+        hba1c:  Number(r[14]) || null,
+        ldl:    Number(r[15]) || null,
+        trig:   Number(r[16]) || null,
       });
     }
   }
 
-  // Current biomarkers from row 2 (first data row with metrics)
-  const current = {
-    weight: rows[2][7] || null,
-    hba1c:  rows[2][8] || null,
-    ldl:    rows[2][9] || null,
-    trig:   rows[2][10] || null,
-  };
+  // Sort actuals by date ascending
+  actuals.sort((a, b) => {
+    const pa = a.date.split('/').reverse().join('');
+    const pb = b.date.split('/').reverse().join('');
+    return pa.localeCompare(pb);
+  });
 
   return { actuals, goals, current };
 }
@@ -106,12 +134,12 @@ function getToday() {
   const wb   = SpreadsheetApp.openById(FILE_ID);
   const sh   = wb.getSheetByName(SHEET_PLAN);
   const rows = sh.getDataRange().getValues();
-  const todayStr = formatDate(new Date());
+  const todayStr = formatSheetDate(new Date());
   const meals = [];
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const rowDate = formatDate(r[0]);
+    const rowDate = formatSheetDate(r[0]);
     if (rowDate !== todayStr) continue;
 
     // Col: 0=date,1=day,2=mealType,3=food1,4=qty1,5=food2,6=qty2,7=food3,8=qty3,9=food4,10=qty4
@@ -138,6 +166,80 @@ function getToday() {
   return { date: todayStr, meals, dailyKcal, dailyProt };
 }
 
+
+// ── GET /plan ─────────────────────────────────────────────────
+// Returns Plan&Rec rows grouped by date for today + next 30 days
+// Each date has up to 4 meals: Breakfast, Lunch, Dinner, Snack
+// Each meal has up to 4 food items with quantities
+function getPlan() {
+  const wb = SpreadsheetApp.openById(FILE_ID);
+  const sh = wb.getSheetByName(SHEET_PLAN);
+  const rows = sh.getDataRange().getValues();
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const horizon = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  const byDate = {};
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r[0]) continue;
+
+    const dateStr = formatSheetDate(r[0]);
+    if (!dateStr) continue;
+    // Check date range
+    const dp = parseSheetDate(r[0]);
+    if (!dp) continue;
+    const dNorm = new Date(dp.getFullYear(), dp.getMonth(), dp.getDate());
+    if (dNorm < today || dNorm > horizon) continue;
+
+    if (!byDate[dateStr]) {
+      byDate[dateStr] = {
+        date:    dateStr,
+        dayName: String(r[1] || '').trim(),
+        ts:      d.getTime(),
+        meals:   {}
+      };
+    }
+
+    const mealType = String(r[2] || '').trim();
+    if (!mealType) continue;
+
+    // Collect up to 4 food+qty pairs (cols 3-10)
+    const items = [];
+    for (let c = 3; c <= 9; c += 2) {
+      const food = r[c];
+      const qty  = r[c + 1];
+      if (food && food !== 0 && String(food).trim() !== '') {
+        items.push({
+          food: String(food).trim(),
+          qty:  (qty && qty !== '' && !isNaN(qty)) ? Number(qty) : 1
+        });
+      }
+    }
+
+    byDate[dateStr].meals[mealType] = {
+      mealType: mealType,
+      items:    items,
+      mealCal:  Number(r[11]) || 0,
+      mealProt: Number(r[13]) || 0,
+    };
+  }
+
+  // Convert to array sorted by date, convert meals object to array
+  const sorted = Object.values(byDate)
+    .sort((a, b) => a.ts - b.ts)
+    .map(day => ({
+      date:    day.date,
+      dayName: day.dayName,
+      meals:   ['Breakfast','Lunch','Dinner','Snack']
+               .map(mt => day.meals[mt] || { mealType: mt, items: [], mealCal: 0, mealProt: 0 })
+    }));
+
+  return { plan: sorted };
+}
+
 // ── GET /history ──────────────────────────────────────────────
 function getHistory() {
   const wb   = SpreadsheetApp.openById(FILE_ID);
@@ -148,7 +250,7 @@ function getHistory() {
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (!r[0]) continue;
-    const d = formatDate(r[0]);
+    const d = formatSheetDate(r[0]);
     if (!byDate[d]) byDate[d] = { date: d, meals: [], kcal: 0, protein: 0 };
     const mealCal  = r[11] || 0;
     const mealProt = r[13] || 0;
@@ -218,7 +320,7 @@ function logMeal(body) {
   // ── 3. Update Dashboard ───────────────────────────────────
   const dashRows = dashSh.getDataRange().getValues();
   for (let i = 2; i < dashRows.length; i++) {
-    const cellDate = formatDate(dashRows[i][1]);
+    const cellDate = formatSheetDate(dashRows[i][1]);
     if (cellDate === date) {
       dashSh.getRange(i + 1, 4).setValue(dayKcal);    // col D = kCal-In
       dashSh.getRange(i + 1, 5).setValue(dayProt);    // col E = Daily Protein
@@ -247,7 +349,7 @@ function logMetrics(body) {
   const { date, weight, hba1c, ldl, trig } = body;
 
   for (let i = 2; i < rows.length; i++) {
-    const cellDate = formatDate(rows[i][1]);
+    const cellDate = formatSheetDate(rows[i][1]);
     if (cellDate === date) {
       if (weight != null) dashSh.getRange(i+1, 8).setValue(weight);  // col H
       if (hba1c  != null) dashSh.getRange(i+1, 9).setValue(hba1c);   // col I
@@ -260,7 +362,80 @@ function logMetrics(body) {
   return { success: true, date, weight, hba1c, ldl, trig };
 }
 
+
+// ── POST /addFood ─────────────────────────────────────────────
+// Body: { category, name, portion, cal, protein, glycemic, remark }
+function addFood(body) {
+  const wb = SpreadsheetApp.openById(FILE_ID);
+  const sh = wb.getSheetByName(SHEET_KCAL_DB);
+
+  // Check for duplicate name (case-insensitive)
+  const rows = sh.getDataRange().getValues();
+  const exists = rows.some((r, i) => i > 0 && 
+    String(r[1]).trim().toLowerCase() === String(body.name).trim().toLowerCase()
+  );
+  if (exists) {
+    return { success: false, error: "Food item already exists: " + body.name };
+  }
+
+  // Append new row in same format as existing kCal-DB rows
+  // Cols: Category | Food Item | Portion | Calories(kcal) | Protein(g) | Glycemic | Remark
+  sh.appendRow([
+    body.category  || "Snack",
+    body.name      || "",
+    body.portion   || "1 serving",
+    Number(body.cal)     || 0,
+    Number(body.protein) || 0,
+    body.glycemic  || "",
+    body.remark    || "",
+  ]);
+
+  return {
+    success: true,
+    message: body.name + " added to kCal-DB",
+    food: {
+      category: body.category,
+      name:     body.name,
+      portion:  body.portion,
+      cal:      Number(body.cal),
+      protein:  Number(body.protein),
+      glycemic: body.glycemic || "",
+      remark:   body.remark  || "",
+    }
+  };
+}
+
 // ── Helpers ───────────────────────────────────────────────────
+// Google Sheets always returns proper Date objects - clean parser
+function parseSheetDate(val) {
+  if (!val || val === '' || val === 0) return null;
+  let d;
+  if (val instanceof Date) {
+    d = val;
+  } else if (typeof val === 'number') {
+    // Excel serial fallback (shouldn't happen with Sheets)
+    d = new Date(Math.round((val - 25569) * 86400 * 1000));
+  } else {
+    d = new Date(String(val));
+  }
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
+function formatSheetDate(val) {
+  const d = parseSheetDate(val);
+  if (!d) return '';
+  const dd   = String(d.getDate()).padStart(2,'0');
+  const mm   = String(d.getMonth()+1).padStart(2,'0');
+  const yyyy = d.getFullYear();
+  return dd + '/' + mm + '/' + yyyy;
+}
+
+// Match a sheet date value against a DD/MM/YYYY string
+function dateMatches(sheetVal, ddmmyyyy) {
+  return formatSheetDate(sheetVal) === ddmmyyyy;
+}
+
 function formatDate(val) {
   if (!val) return "";
   let d;
