@@ -126,7 +126,7 @@ function go(s){ if(typeof _go==="function") _go(s); else window._qNav=s; }
   </nav>
 </div>
 <script>
-let API = localStorage.getItem('ht_api_url') || '';
+let API = localStorage.getItem('ht_api_url') || sessionStorage.getItem('ht_api_url') || '';
 // ---
 
 const FOOD_DB_LOCAL=[
@@ -187,6 +187,8 @@ const getDay=(s)=>{try{const p=s.split('/');return new Date(+p[2],+p[1]-1,+p[0])
 const ld=()=>`<div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
 
 async function api(action,body){
+  // Re-read from storage in case it was set after init
+  if(!API) API=localStorage.getItem('ht_api_url')||sessionStorage.getItem('ht_api_url')||'';
   if(isSetup()) return null;
   const url=`${API}?action=${action}`;
   const r=await fetch(url,body?{method:"POST",body:JSON.stringify(body)}:{method:"GET"});
@@ -787,7 +789,10 @@ function isPastDate(ddmmyyyy){
 }
 
 function setSlotFood(idx, name){
-  if(!name) return; // never clear a slot via onchange - user must use a clear button
+  if(!name) return;
+  // Debounce: ignore if same value already set
+  const current = S.log.items&&S.log.items[idx]?S.log.items[idx].name:'';
+  if(name.trim()===current.trim()) return; // never clear a slot via onchange - user must use a clear button
   const foods=S.foods?.foods||FOOD_DB_LOCAL;
   if(!S.log.items||S.log.items.length<4) S.log.items=[null,null,null,null];
   const n=name.trim().toLowerCase();
@@ -835,6 +840,143 @@ function loadPlanIntoSlots(){
   });
   reLog();
 }
+
+// ── Action functions ─────────────────────────────────────────
+
+function setMeal(m){
+  S.log.meal=m;
+  S.log.items=[null,null,null,null];
+  S.log.search='';
+  reLog();
+}
+
+function reLog(){
+  const el=document.getElementById('scr');
+  if(el) el.innerHTML=renderLog();
+}
+
+function reFoods(){
+  const el=document.getElementById('scr');
+  if(el) el.innerHTML=renderFoods();
+}
+
+function setFF(f){
+  S.foodFilter=f;
+  reFoods();
+}
+
+function resetLog(){
+  const d=S.log.date;
+  S.log={meal:'Breakfast',items:[null,null,null,null],search:'',date:d};
+  S.logDone=false;
+  S.logResult=null;
+  reLog();
+}
+
+function resetMetrics(){
+  S.metricsDone=false;
+  S.metrics={weight:'',hba1c:'',ldl:'',trig:''};
+  _go('metrics');
+}
+
+async function submitLog(){
+  const{meal,items,date}=S.log;
+  const validItems=items.filter(Boolean);
+  if(!validItems.length) return;
+  const totalCal=Math.round(validItems.reduce((s,i)=>s+i.cal*i.qty,0));
+  const totalProtein=Math.round(validItems.reduce((s,i)=>s+i.protein*i.qty,0));
+  const el=document.getElementById('scr');
+  el.innerHTML=`<div style="padding:calc(100px + var(--safe-t)) 16px;text-align:center">
+    ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">Writing to Drive...</div>
+    <div style="color:var(--muted);font-size:13px;margin-top:6px">Updating Plan&amp;Rec + Dashboard</div></div>`;
+  let result;
+  if(isSetup()){
+    result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};
+  } else {
+    try{
+      result=await api('logMeal',{
+        date:S.log.date,
+        dayName:getDay(S.log.date),
+        mealType:meal,
+        items:validItems.map(i=>({food:i.name,qty:i.qty,cal:i.cal,protein:i.protein})),
+        totalCal,totalProtein
+      });
+    }catch(e){
+      result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};
+    }
+  }
+  S.logResult=result;
+  S.logDone=true;
+  S.today=null;
+  S.plan=null;
+  el.innerHTML=renderLogDone();
+}
+
+async function submitMetrics(){
+  const{weight,hba1c,ldl,trig}=S.metrics;
+  if(!weight&&!hba1c&&!ldl&&!trig) return;
+  const el=document.getElementById('scr');
+  el.innerHTML=`<div style="padding:calc(100px + var(--safe-t)) 16px;text-align:center">
+    ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">Updating Drive...</div></div>`;
+  if(!isSetup()){
+    try{
+      await api('logMetrics',{
+        date:todayKey(),
+        weight:weight?parseFloat(weight):null,
+        hba1c:hba1c?parseFloat(hba1c):null,
+        ldl:ldl?parseFloat(ldl):null,
+        trig:trig?parseFloat(trig):null
+      });
+    }catch(e){}
+  }
+  S.metricsDone=true;
+  S.dash=null;
+  el.innerHTML=renderMetrics();
+}
+
+function toggleAddFood(){
+  S.addFood.show=!S.addFood.show;
+  S.addFood.done=false;
+  S.addFood.error='';
+  reFoods();
+}
+
+async function submitAddFood(){
+  const af=S.addFood;
+  if(!af.name.trim()){af.error='Food name is required';reFoods();return;}
+  if(!af.cal){af.error='Calories are required';reFoods();return;}
+  S.addFood.saving=true; S.addFood.error=''; reFoods();
+  const body={
+    category:af.category, name:af.name.trim(),
+    portion:af.portion.trim()||'1 serving',
+    cal:parseFloat(af.cal)||0, protein:parseFloat(af.protein)||0,
+    glycemic:af.glycemic, remark:af.remark
+  };
+  if(isSetup()){
+    if(!S.foods) S.foods={foods:[...FOOD_DB_LOCAL]};
+    S.foods.foods.push(body);
+    S.addFood={show:true,name:'',category:'Snack',portion:'1 serving',
+      cal:'',protein:'',glycemic:'',remark:'',saving:false,error:'',done:true};
+    reFoods(); return;
+  }
+  try{
+    const result=await api('addFood',body);
+    if(result&&result.success){
+      if(!S.foods) S.foods={foods:[...FOOD_DB_LOCAL]};
+      S.foods.foods.push(result.food);
+      S.addFood={show:true,name:'',category:'Snack',portion:'1 serving',
+        cal:'',protein:'',glycemic:'',remark:'',saving:false,error:'',done:true};
+    } else {
+      S.addFood.saving=false;
+      S.addFood.error=result?.error||'Failed to save. Try again.';
+    }
+  }catch(e){
+    S.addFood.saving=false;
+    S.addFood.error='Network error. Check connection.';
+  }
+  reFoods();
+}
+
 // ── Chart builders ───────────────────────────────────────────
 const CG="#1E2A45",CT="#6B7A9F";
 const cOpts={responsive:true,maintainAspectRatio:false,
@@ -965,6 +1107,7 @@ function saveApiUrl(){
   err.style.display='none';
   API=val;
   localStorage.setItem('ht_api_url',val);
+  sessionStorage.setItem('ht_api_url',val);
   document.getElementById('setup-overlay').style.display='none';
   _go('home');
 }
@@ -974,6 +1117,7 @@ function skipSetup(){
 }
 function resetApiUrl(){
   localStorage.removeItem('ht_api_url');
+  sessionStorage.removeItem('ht_api_url');
   API='';
   showSetupPopup();
 }
