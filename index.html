@@ -164,7 +164,7 @@ const FOOD_DB_LOCAL=[
 
 let S={
   screen:"home",dash:null,foods:null,today:null,plan:null,
-  log:{meal:"Breakfast",items:[],search:"",date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})},
+  log:{meal:"Breakfast",items:[null,null,null,null],search:"",date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})},
   logDone:false,logResult:null,
   foodFilter:"All",
   metrics:{weight:"",hba1c:"",ldl:"",trig:""},
@@ -341,120 +341,130 @@ function renderHome(){
 
 function renderLog(){
   if(S.logDone) return renderLogDone();
-  const{meal,items,search,date}=S.log;
+  const{meal,items,date}=S.log;
   const foods=S.foods?.foods||FOOD_DB_LOCAL;
   const plan=S.plan?.plan||[];
 
-  // Date pills: today + next 6 days
-  const dateOpts=[];
-  for(let i=0;i<7;i++){
-    const d=new Date(); d.setDate(d.getDate()+i);
-    const key=d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
-    const label=i===0?'Today':i===1?'Tomorrow':
-      d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
-    dateOpts.push({key,label});
-  }
-
   // Find plan for selected date
   const planDay=plan.find(p=>p.date===date);
+  const planMeal=planDay?.meals?.find(m=>m.mealType===meal);
 
-  // Build plan section: show all 4 meals for the day
-  let planHTML='';
-  if(planDay){
-    const dayMeals=planDay.meals||[];
-    const hasAny=dayMeals.some(m=>m.items&&m.items.length>0);
-    planHTML=`<div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);
-      border-radius:16px;padding:14px;margin-bottom:16px">
-      <div style="color:var(--accent);font-size:10px;font-weight:700;letter-spacing:1.5px;margin-bottom:12px">
-        PLAN FOR ${planDay.dayName.toUpperCase()} &mdash; ${date.slice(0,5)}</div>
-      ${hasAny ? dayMeals.filter(m=>m.items&&m.items.length>0).map(m=>{
-        const isActive=meal===m.mealType;
-        return`<div onclick="selectMeal('${m.mealType}')"
-          style="padding:10px 12px;border-radius:12px;margin-bottom:6px;cursor:pointer;
-            background:${isActive?'rgba(0,229,160,0.12)':'var(--surface)'};
-            border:1px solid ${isActive?'var(--accent)':'var(--border)'}">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-            <span style="color:${isActive?'var(--accent)':'var(--text)'};font-size:13px;font-weight:700">
-              ${m.mealType}</span>
-            <span style="color:var(--accent);font-size:12px;font-weight:600">${m.mealCal} kcal</span>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px">
-            ${m.items.map(it=>{
-              const already=items.find(i=>i.name.toLowerCase()===it.food.toLowerCase());
-              return`<span onclick="event.stopPropagation();addPlannedItem('${it.food.replace(/'/g,'&#39;')}')"
-                style="font-size:11px;padding:3px 10px;border-radius:99px;cursor:pointer;
-                  background:${already?'var(--adim)':'var(--card)'};
-                  border:1px solid ${already?'var(--accent)':'var(--border)'};
-                  color:${already?'var(--accent)':'var(--muted)'}">
-                ${already?'&#10003; ':''}${it.food}${it.qty&&it.qty!==1?' x'+it.qty:''}
-              </span>`;
-            }).join('')}
-          </div>
-        </div>`;
-      }).join('')
-      :`<div style="color:var(--muted);font-size:12px;padding:4px 0">No meals planned for this day yet</div>`}
-    </div>`;
-  } else {
-    planHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
-      padding:10px 14px;margin-bottom:14px;color:var(--muted);font-size:12px">
-      No plan found for ${date.slice(0,5)} &mdash; add items below
-    </div>`;
-  }
+  // Build food options for dropdowns:
+  // Breakfast/Lunch/Dinner: category foods + Anytime foods
+  // Snack: only Snack category
+  const mealFoods = meal==='Snack'
+    ? foods.filter(f=>f.category==='Snack')
+    : foods.filter(f=>f.category===meal||f.category==='Anytime');
 
-  const shown=search
-    ?foods.filter(f=>f.name.toLowerCase().includes(search.toLowerCase())).slice(0,16)
-    :foods.filter(f=>f.category===meal).slice(0,16);
-  const totCal=items.reduce((s,i)=>s+i.cal*i.qty,0);
-  const totPro=items.reduce((s,i)=>s+i.protein*i.qty,0);
+  // Build 4 dropdown slots - pre-fill from plan if available
+  const slots = [0,1,2,3].map(i=>{
+    const planned = planMeal?.items?.[i];
+    const current = items[i];
+    return {
+      selected: current?.name || planned?.food || '',
+      qty: current?.qty || planned?.qty || 1,
+      planned: planned?.food || ''
+    };
+  });
 
-  return`<div class="pad">
-  <div style="font-size:22px;font-weight:800;margin-bottom:16px">Log Meal</div>
+  const totCal = items.reduce((s,i)=>s+(i?i.cal*i.qty:0),0);
+  const totPro = items.reduce((s,i)=>s+(i?i.protein*i.qty:0),0);
 
-  <!-- Date selector -->
-  <div style="margin-bottom:14px">
+  // Build food options HTML for select
+  const blankOpt = '<option value="">-- Select food --</option>';
+  const foodOpts = mealFoods.map(f=>`<option value="${f.name}">${f.name} (${f.cal} kcal, ${f.protein}g P)</option>`).join('');
+
+  return`<div class="pad" style="padding-bottom:20px">
+  <div style="font-size:22px;font-weight:800;margin-bottom:20px">Log Meal</div>
+
+  <!-- Calendar Date Picker -->
+  <div style="margin-bottom:16px">
     <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:8px">DATE</div>
+    <input type="date" value="${dateToISO(date)}"
+      onchange="onDateChange(this.value)"
+      style="width:100%;padding:12px 16px;border-radius:14px;border:1px solid var(--border);
+        background:var(--card);color:var(--text);font-family:inherit;font-size:15px;
+        font-weight:600;outline:none;-webkit-appearance:none"/>
+  </div>
+
+  <!-- Meal Type -->
+  <div style="margin-bottom:16px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:8px">MEAL TYPE</div>
     <div class="prow">
-      ${dateOpts.map(o=>`<button class="pill${date===o.key?' on':''}"
-        onclick="S.log.date='${o.key}';S.log.items=[];reLog()">${o.label}</button>`).join('')}
+      ${["Breakfast","Lunch","Dinner","Snack"].map(m=>`<button class="pill${meal===m?' on':''}"
+        onclick="setMeal('${m}')">${m}</button>`).join('')}
     </div>
   </div>
 
-  <!-- Plan panel -->
-  ${planHTML}
+  <!-- Plan reference -->
+  ${planMeal&&planMeal.items.length?`
+  <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);
+    border-radius:14px;padding:12px 14px;margin-bottom:16px">
+    <div style="color:var(--accent);font-size:10px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px">
+      PLANNED ${meal.toUpperCase()} &mdash; ${planDay.dayName} ${date.slice(0,5)}</div>
+    <div style="color:var(--text);font-size:13px">${planMeal.items.map(i=>i.food+(i.qty&&i.qty!==1?' x'+i.qty:'')).join(' &middot; ')}</div>
+    <div style="color:var(--accent);font-size:12px;margin-top:4px">${planMeal.mealCal} kcal &middot; ${planMeal.mealProt}g protein</div>
+    <button onclick="loadPlanIntoSlots()" style="margin-top:8px;padding:6px 14px;border-radius:99px;
+      border:1px solid var(--accent);background:var(--adim);color:var(--accent);
+      font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      Use planned items &#8594;
+    </button>
+  </div>`:
+  `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:10px 14px;margin-bottom:14px;color:var(--muted);font-size:12px">
+    No plan for ${meal} on ${date.slice(0,5)}
+  </div>`}
 
-  <!-- Meal type pills -->
-  <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:8px">ADD TO LOG</div>
-  <div class="prow">
-    ${["Breakfast","Lunch","Dinner","Snack"].map(m=>`<button class="pill${meal===m?' on':''}"
-      onclick="setMeal('${m}')">${m}</button>`).join('')}
-  </div>
-
-  <!-- Search -->
-  <input type="text" placeholder="Search food to add..." value="${search}"
-    oninput="S.log.search=this.value;reLog()" style="width:100%;margin-bottom:12px"/>
-
-  <!-- Food list -->
-  <div>${shown.map(food=>{
-    const sel=items.find(i=>i.name===food.name);
-    return`<div class="fi${sel?' on':''}" data-name="${food.name}" onclick="toggleFood(this.dataset.name)">
+  <!-- 4 Food Dropdown Slots -->
+  <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px">SELECT ITEMS (UP TO 4)</div>
+  ${[0,1,2,3].map(i=>{
+    const sl=slots[i];
+    const fd=sl.selected?foods.find(f=>f.name===sl.selected):null;
+    return`<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <div style="flex:1">
-        <div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:3px">
-          <span style="font-size:14px;font-weight:${sel?700:400}">${food.name}</span>${tagH(food)}
-        </div>
-        <span style="color:var(--muted);font-size:11px">${food.cal} kcal &middot; ${food.protein}g protein &middot; ${food.portion||food.category}</span>
+        <select onchange="setSlotFood(${i},this.value)"
+          style="width:100%;padding:11px 12px;border-radius:12px;
+            border:1px solid ${sl.selected?'var(--accent)':'var(--border)'};
+            background:var(--card);color:${sl.selected?'var(--text)':'var(--muted)'};
+            font-family:inherit;font-size:13px;outline:none">
+          ${blankOpt}${mealFoods.map(f=>`<option value="${f.name}" ${sl.selected===f.name?'selected':''}>${f.name} (${f.cal} kcal)</option>`).join('')}
+        </select>
+        ${fd?`<div style="color:var(--muted);font-size:10px;margin-top:3px;padding-left:4px">
+          ${fd.cal} kcal &middot; ${fd.protein}g protein &middot; ${fd.portion||''}
+        </div>`:''}
       </div>
-      ${sel?`<input type="number" min=".5" step=".5" value="${sel.qty}"
-          onclick="event.stopPropagation()"
-          onchange="setQty(this.closest('[data-name]').dataset.name,this.value)"/>`
-        :`<span style="color:var(--muted);font-size:22px">+</span>`}
-    </div>`;}).join('')}
-    ${!shown.length?`<div style="color:var(--muted);text-align:center;padding:24px">No results</div>`:''}
+      ${sl.selected?`<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div style="color:var(--muted);font-size:9px;letter-spacing:1px">QTY</div>
+        <input type="number" min="0.5" step="0.5" value="${sl.qty}"
+          onchange="setSlotQty(${i},this.value)"
+          style="width:58px;padding:8px 6px;border-radius:10px;border:1px solid var(--accent);
+            background:var(--surface);color:var(--accent);font-size:14px;
+            font-weight:700;text-align:center;font-family:inherit;outline:none"/>
+      </div>`:''}
+    </div>`;
+  }).join('')}
+
+  <!-- Summary -->
+  ${items.filter(Boolean).length?`
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:14px;margin-top:8px;margin-bottom:80px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:1.5px;margin-bottom:8px">SUMMARY</div>
+    ${items.filter(Boolean).map(i=>`
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text);font-size:13px">${i.name} x${i.qty}</span>
+      <span style="color:var(--accent);font-size:13px;font-weight:600">${Math.round(i.cal*i.qty)} kcal</span>
+    </div>`).join('')}
+    <div style="display:flex;justify-content:space-between;padding:8px 0 0">
+      <span style="color:var(--text);font-weight:700">Total</span>
+      <span style="color:var(--accent);font-weight:800;font-size:16px">${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g P</span>
+    </div>
+  </div>`:''}
   </div>
-  </div>
-  ${items.length?`<div class="logbar">
+
+  ${items.filter(Boolean).length?`<div class="logbar">
     <div>
       <div style="color:var(--accent);font-weight:800;font-size:18px">${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g</div>
-      <div style="color:var(--muted);font-size:11px">${meal} &mdash; ${date.slice(0,5)} &mdash; ${items.length} item${items.length>1?'s':''}</div>
+      <div style="color:var(--muted);font-size:11px">${meal} &mdash; ${date.slice(0,5)}</div>
     </div>
     <button onclick="submitLog()" style="background:var(--accent);border:none;border-radius:12px;
       padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit">
@@ -710,7 +720,61 @@ function addPlannedItem(name){
   else S.log.items.push({...food,qty:1});
   reLog();
 }
-function setMeal(m){S.log.meal=m;S.log.search="";reLog();}
+
+// Convert DD/MM/YYYY to YYYY-MM-DD for date input
+function dateToISO(ddmmyyyy){
+  const p=ddmmyyyy.split('/');
+  return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:new Date().toISOString().slice(0,10);
+}
+
+// Convert YYYY-MM-DD to DD/MM/YYYY
+function isoToDate(iso){
+  const p=iso.split('-');
+  return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:S.log.date;
+}
+
+function onDateChange(isoVal){
+  S.log.date=isoToDate(isoVal);
+  S.log.items=[null,null,null,null];
+  reLog();
+}
+
+function setSlotFood(idx, name){
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  if(!S.log.items) S.log.items=[null,null,null,null];
+  while(S.log.items.length<4) S.log.items.push(null);
+  if(!name){
+    S.log.items[idx]=null;
+  } else {
+    const food=foods.find(f=>f.name===name);
+    if(food){
+      const qty=S.log.items[idx]?.qty||1;
+      S.log.items[idx]={...food,qty};
+    }
+  }
+  reLog();
+}
+
+function setSlotQty(idx, val){
+  if(S.log.items[idx]) S.log.items[idx].qty=parseFloat(val)||1;
+}
+
+function loadPlanIntoSlots(){
+  const{meal,date}=S.log;
+  const plan=S.plan?.plan||[];
+  const planDay=plan.find(p=>p.date===date);
+  const planMeal=planDay?.meals?.find(m=>m.mealType===meal);
+  if(!planMeal) return;
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  S.log.items=[null,null,null,null];
+  planMeal.items.slice(0,4).forEach((pi,i)=>{
+    const food=foods.find(f=>f.name.toLowerCase()===pi.food.toLowerCase())
+      ||{name:pi.food,cal:0,protein:0,category:meal,portion:'1 serving'};
+    S.log.items[i]={...food,qty:pi.qty||1};
+  });
+  reLog();
+}
+function setMeal(m){S.log.meal=m;S.log.items=[null,null,null,null];S.log.search="";reLog();}
 
 function reFoods(){ document.getElementById("scr").innerHTML=renderFoods(); }
 
@@ -782,9 +846,10 @@ function setQty(name,val){const i=S.log.items.find(i=>i.name===name);if(i)i.qty=
 
 async function submitLog(){
   const{meal,items}=S.log;
-  if(!items.length) return;
-  const totalCal=Math.round(items.reduce((s,i)=>s+i.cal*i.qty,0));
-  const totalProtein=Math.round(items.reduce((s,i)=>s+i.protein*i.qty,0));
+  const validItems=items.filter(Boolean);if(!validItems.length) return;
+  const totalCal=Math.round(validItems.reduce((s,i)=>s+i.cal*i.qty,0));
+  const totalProtein=Math.round(validItems.reduce((s,i)=>s+i.protein*i.qty,0));
+  const totalCal2=totalCal;
   document.getElementById("scr").innerHTML=`<div style="padding:calc(100px + var(--safe-t)) 16px;text-align:center">
     ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">Writing to Drive…</div>
     <div style="color:var(--muted);font-size:13px;margin-top:6px">Updating Plan&amp;Rec + Dashboard</div></div>`;
@@ -793,7 +858,7 @@ async function submitLog(){
     result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};
   } else {
     try{result=await api("logMeal",{date:todayKey(),dayName:dayName(),mealType:meal,
-      items:items.map(i=>({food:i.name,qty:i.qty,cal:i.cal,protein:i.protein})),totalCal,totalProtein});}
+      items:validItems.map(i=>({food:i.name,qty:i.qty,cal:i.cal,protein:i.protein})),totalCal,totalProtein});}
     catch(e){result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};}
   }
   S.logResult=result; S.logDone=true; S.today=null; S.plan=null;
@@ -801,7 +866,7 @@ async function submitLog(){
 }
 
 function resetMetrics(){S.metricsDone=false;S.metrics={weight:"",hba1c:"",ldl:"",trig:""};go("metrics");}
-function resetLog(){const d=S.log.date;S.log={meal:"Breakfast",items:[],search:"",date:d};S.logDone=false;S.logResult=null;reLog();}
+function resetLog(){const d=S.log.date;S.log={meal:"Breakfast",items:[null,null,null,null],search:"",date:d};S.logDone=false;S.logResult=null;reLog();}
 
 async function submitMetrics(){
   const{weight,hba1c,ldl,trig}=S.metrics;
