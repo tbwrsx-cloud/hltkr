@@ -122,11 +122,8 @@ input[type=number]{width:58px;text-align:center;padding:6px 8px;border-radius:8p
   </nav>
 </div>
 <script>
-// ══════════════════════════════════════════════════════════════
-// STEP 1: Paste your Apps Script Web App URL below
-// ══════════════════════════════════════════════════════════════
-const API = https://script.google.com/macros/s/AKfycbyOSI9HHliQHgH5RMx7pLXygjS9_UGUvRSXN2qZYr4UPKgB198Ap64-Y8r4XTq5Wzoijg/exec;
-// ══════════════════════════════════════════════════════════════
+let API = localStorage.getItem('ht_api_url') || '';
+// ---
 
 const FOOD_DB_LOCAL=[
   {category:"Breakfast",name:"Idli",portion:"1 small",cal:60,protein:2,glycemic:"",remark:""},
@@ -175,7 +172,7 @@ let S={
   charts:{},
 };
 
-const isSetup=()=>API==="YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+const isSetup=()=>!API||API==='';
 const fmt=n=>Math.round(n).toLocaleString();
 const greet=()=>{const h=new Date().getHours();return h<12?"Good Morning":h<17?"Good Afternoon":"Good Evening";};
 const dayStr=()=>new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
@@ -264,7 +261,7 @@ function goalBar(label,cur,goal,unit){
   return`<div class="gbw">
     <div class="gbr">
       <span style="color:var(--muted);font-size:12px">${label}</span>
-      <span style="color:${good?'var(--accent)':'var(--warn)'}";font-size:12px;font-weight:600">${cur} → ${goal} ${unit}</span>
+      <span style="color:${good?'var(--accent)':'var(--warn)'};font-size:12px;font-weight:600">${cur} → ${goal} ${unit}</span>
     </div>
     <div class="gbt"><div class="gbf" style="width:${w}%;background:${gr}"></div></div>
   </div>`;
@@ -294,7 +291,7 @@ function renderHome(){
   const actuals=(d?.actuals||[]).filter(a=>a.kcalIn>0);
   const avg=actuals.length?Math.round(actuals.reduce((s,a)=>s+a.kcalIn,0)/actuals.length):0;
   return`<div class="pad">
-  ${isSetup()?`<div class="setup fu">⚙️ <strong>Setup:</strong> Open <code>index.html</code>, find <code>YOUR_APPS_SCRIPT_WEB_APP_URL_HERE</code> and replace with your deployed Apps Script URL. Sample data shown.</div>`:""}
+  ${isSetup() ? '<div class="setup fu">&#9881;&#65039; <strong>Sample data</strong> &mdash; Drive not connected. <span onclick="showSetupPopup()" style="color:#00E5A0;text-decoration:underline;cursor:pointer">Connect now</span></div>' : '<div style="background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#00E5A0;display:flex;justify-content:space-between;align-items:center"><span>&#10003; Connected to Drive</span><span onclick="resetApiUrl()" style="color:#6B7A9F;cursor:pointer;font-size:11px">Change URL</span></div>'}
   <div style="padding-bottom:20px" class="fu">
     <div style="color:var(--muted);font-size:11px;letter-spacing:2px;text-transform:uppercase">${dayStr()}</div>
     <div style="font-size:26px;font-weight:800;margin-top:4px">${greet()} 👋</div>
@@ -302,7 +299,7 @@ function renderHome(){
   <div class="card fu" style="background:linear-gradient(135deg,var(--card),#1A2240);box-shadow:0 0 40px rgba(0,229,160,0.07)">
     <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:16px">TODAY'S INTAKE</div>
     <div style="display:flex;justify-content:space-around">
-      ${ring(kcal,1600,kcal>1800?"var(--orange)":"var(--accent)","kcal","CALORIES")}
+      ${ring(kcal,1600,kcal>1800?'var(--orange)':'var(--accent)',"kcal","CALORIES")}
       ${ring(prot,80,"var(--blue)","protein","GRAMS")}
       ${ring(budget,1600,"var(--purple)","budget","LEFT")}
     </div>
@@ -358,13 +355,13 @@ function renderLog(){
           onclick="event.stopPropagation()" onchange="setQty('${food.name.replace(/'/g,"\\'")}',this.value)"/>`
         :`<span style="color:var(--muted);font-size:22px">+</span>`}
     </div>`;}).join("")}
-    ${!shown.length?`<div style="color:var(--muted);text-align:center;padding:24px">No results</div>`:""}
-    ${!items.length?`<div style="color:var(--muted);text-align:center;padding:24px;font-size:13px">Tap items to add them</div>`:""}
+    ${!shown.length?`<div style="color:var(--muted);text-align:center;padding:24px">No results</div>`:''}
+    ${!items.length?`<div style="color:var(--muted);text-align:center;padding:24px;font-size:13px">Tap items to add them</div>`:''}
   </div></div>
   ${items.length?`<div class="logbar">
     <div>
       <div style="color:var(--accent);font-weight:800;font-size:18px">${fmt(totCal)} kcal · ${Math.round(totPro)}g</div>
-      <div style="color:var(--muted);font-size:11px">${items.length} item${items.length>1?"s":""}</div>
+      <div style="color:var(--muted);font-size:11px">${items.length} item${items.length>1?'s':''}</div>
     </div>
     <button onclick="submitLog()" style="background:var(--accent);border:none;border-radius:12px;
       padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;cursor:pointer;font-family:'Sora',sans-serif">
@@ -429,7 +426,7 @@ function renderTrends(){
       </div>
       <div style="display:flex;gap:6px">
         ${(m.goals||[]).map((g,i)=>`<div class="ms">
-          <div class="msb${m.current<=g?" hit":""}"><div class="msv">${g}</div></div>
+          <div class="msb${m.current<=g?' hit':''}"><div class="msv">${g}</div></div>
           <div class="msy">${(m.years||[])[i]||""}</div>
         </div>`).join("")}
       </div>
@@ -479,7 +476,7 @@ function renderMetrics(){
       {key:"hba1c",label:"HbA1c",sub:"Goal: 6.5% by Dec '26",ph:"7.0",unit:"%",step:"0.1"},
       {key:"ldl",label:"LDL",sub:"Goal: 150 mg/dL by Dec '26",ph:"186",unit:"mg/dL",step:"1"},
       {key:"trig",label:"Triglycerides",sub:"Goal: 175 mg/dL by Dec '26",ph:"220",unit:"mg/dL",step:"1"},
-    ].map((f,i)=>`<div class="mfr" style="${i===3?"border-bottom:none":""}">
+    ].map((f,i)=>`<div class="mfr" style="${i===3?'border-bottom:none':''}">
       <div>
         <div style="color:var(--text);font-size:14px;font-weight:600">${f.label}</div>
         <div style="color:var(--muted);font-size:11px">${f.sub}</div>
@@ -605,16 +602,91 @@ function buildBarChart(){
   l.href='https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap';
   document.head.appendChild(l);
 })();
-// Load Chart.js dynamically then init
+// Load Chart.js then init
 (function(){
   var s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-  s.onload = function(){ go('home'); };
-  s.onerror = function(){ go('home'); }; // still init even if Chart fails
+  s.onload = function(){
+    if(!API) showSetupPopup();
+    else go('home');
+  };
+  s.onerror = function(){
+    if(!API) showSetupPopup();
+    else go('home');
+  };
   document.head.appendChild(s);
 })();
 if("serviceWorker" in navigator)
   window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 </script>
+
+<!-- Setup Popup -->
+<div id="setup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);
+  z-index:999;display:none;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:#161D2F;border:1px solid #1E2A45;border-radius:24px;
+    padding:28px 24px;width:100%;max-width:390px;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <div style="font-size:36px;text-align:center;margin-bottom:16px">⚙️</div>
+    <div style="font-size:20px;font-weight:800;color:#F0F4FF;text-align:center;margin-bottom:8px">
+      Connect Your Drive</div>
+    <div style="font-size:13px;color:#6B7A9F;text-align:center;line-height:1.6;margin-bottom:24px">
+      Paste your Google Apps Script Web App URL below.<br/>
+      <span style="color:#00E5A0">script.google.com</span> &rarr; Deploy &rarr; Web App &rarr; Copy URL
+    </div>
+    <input id="api-url-input" type="url"
+      placeholder="https://script.google.com/macros/s/..."
+      style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid #1E2A45;
+        background:#111827;color:#F0F4FF;font-size:13px;font-family:inherit;
+        outline:none;margin-bottom:8px;transition:border-color .2s"
+      onfocus="this.style.borderColor='#00E5A0'"
+      onblur="this.style.borderColor='#1E2A45'"
+      onkeydown="if(event.key==='Enter')saveApiUrl()"/>
+    <div id="url-error" style="color:#FF4757;font-size:12px;margin-bottom:12px;display:none">
+      Please enter a valid Apps Script URL</div>
+    <button onclick="saveApiUrl()" style="width:100%;padding:15px;border-radius:14px;border:none;
+      background:linear-gradient(135deg,#00E5A0,#00C98A);color:#0A0F1E;font-weight:800;
+      font-size:15px;cursor:pointer;font-family:inherit;
+      box-shadow:0 8px 24px rgba(0,229,160,0.3);margin-bottom:12px">
+      Connect &rarr;
+    </button>
+    <button onclick="skipSetup()" style="width:100%;padding:12px;border-radius:14px;border:none;
+      background:transparent;color:#6B7A9F;font-size:13px;cursor:pointer;font-family:inherit">
+      Skip &mdash; use sample data
+    </button>
+  </div>
+</div>
+
+<script>
+function showSetupPopup(){
+  var el=document.getElementById('setup-overlay');
+  el.style.display='flex';
+  setTimeout(function(){ document.getElementById('api-url-input').focus(); }, 100);
+}
+
+function saveApiUrl(){
+  var val = document.getElementById('api-url-input').value.trim();
+  var err = document.getElementById('url-error');
+  if(!val || !val.startsWith('https://script.google.com')){
+    err.style.display='block';
+    return;
+  }
+  err.style.display='none';
+  API = val;
+  localStorage.setItem('ht_api_url', val);
+  document.getElementById('setup-overlay').style.display='none';
+  go('home');
+}
+
+function skipSetup(){
+  document.getElementById('setup-overlay').style.display='none';
+  go('home');
+}
+
+function resetApiUrl(){
+  localStorage.removeItem('ht_api_url');
+  API='';
+  showSetupPopup();
+}
+</script>
+
 </body>
 </html>
