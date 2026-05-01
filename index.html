@@ -125,7 +125,7 @@ input[type=number]{width:58px;text-align:center;padding:6px 8px;border-radius:8p
 // ══════════════════════════════════════════════════════════════
 // STEP 1: Paste your Apps Script Web App URL below
 // ══════════════════════════════════════════════════════════════
-const API = https://script.google.com/macros/s/AKfycbyOSI9HHliQHgH5RMx7pLXygjS9_UGUvRSXN2qZYr4UPKgB198Ap64-Y8r4XTq5Wzoijg/exec
+const API = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 // ══════════════════════════════════════════════════════════════
 
 const FOOD_DB_LOCAL=[
@@ -342,12 +342,12 @@ function renderLog(){
   return`<div class="pad">
   <div style="font-size:22px;font-weight:800;margin-bottom:20px">Log Meal</div>
   <div class="prow">${["Breakfast","Lunch","Dinner","Snack"].map(m=>
-    `<button class="pill${meal===m?" on":""}" onclick="setMeal('${m}')">${m}</button>`).join("")}</div>
+    `<button class="pill${meal===m?' on':''}" onclick="setMeal('${m}')">${m}</button>`).join("")}</div>
   <input type="text" placeholder="🔍 Search food..." value="${search}"
     oninput="S.log.search=this.value;reLog()" style="width:100%;margin-bottom:14px"/>
   <div>${shown.map(food=>{
     const sel=items.find(i=>i.name===food.name);
-    return`<div class="fi${sel?" on":""}" onclick="toggleFood('${food.name.replace(/'/g,"\\'")}')">
+    return`<div class="fi${sel?' on':''}" onclick="toggleFood('${food.name.replace(/'/g,"\\'")}')">
       <div style="flex:1">
         <div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:3px">
           <span style="font-size:14px;font-weight:${sel?700:400}">${food.name}</span>${tagH(food)}
@@ -444,7 +444,7 @@ function renderFoods(){
   return`<div class="pad">
   <div style="font-size:22px;font-weight:800;margin-bottom:4px">Food Database</div>
   <div style="color:var(--muted);font-size:12px;margin-bottom:16px">${foods.length} items from your Drive</div>
-  <div class="prow">${cats.map(c=>`<button class="pill${S.foodFilter===c?" on":""}" onclick="setFF('${c}')">${c}</button>`).join("")}</div>
+  <div class="prow">${cats.map(c=>`<button class="pill${S.foodFilter===c?' on':''}" onclick="setFF('${c}')">${c}</button>`).join("")}</div>
   ${shown.map(f=>`<div class="fi" style="cursor:default">
     <div style="flex:1">
       <div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:4px">
