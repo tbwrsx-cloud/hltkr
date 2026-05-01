@@ -164,11 +164,12 @@ const FOOD_DB_LOCAL=[
 
 let S={
   screen:"home",dash:null,foods:null,today:null,plan:null,
-  log:{meal:"Breakfast",items:[null,null,null,null],search:"",date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})},
+  log:{meal:"Breakfast",items:[null,null,null,null],search:"",date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})()},
   logDone:false,logResult:null,
   foodFilter:"All",
   metrics:{weight:"",hba1c:"",ldl:"",trig:""},
   metricsDone:false,
+  addFood:{show:false,name:"",category:"Snack",portion:"1 serving",cal:"",protein:"",glycemic:"",remark:"",saving:false,error:"",done:false},
   charts:{},
 };
 
@@ -282,9 +283,9 @@ async function go(screen){
   killCharts();
   const el=document.getElementById("scr");
   el.innerHTML=ld(); el.scrollTop=0;
-  if(screen==="home"){await Promise.all([loadDash(),loadToday()]);el.innerHTML=renderHome();requestAnimationFrame(buildSparkline);}
+  if(screen==="home"){S.today=null;await Promise.all([loadDash(),loadToday()]);el.innerHTML=renderHome();requestAnimationFrame(buildSparkline);}
   else if(screen==="log"){await Promise.all([loadFoods(),loadPlan()]);el.innerHTML=renderLog();}
-  else if(screen==="trends"){await loadDash();el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();});}
+  else if(screen==="trends"){S.dash=null;await loadDash();el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();});}
   else if(screen==="foods"){await loadFoods();el.innerHTML=renderFoods();}
   else if(screen==="metrics"){el.innerHTML=renderMetrics();}
 }
@@ -346,7 +347,11 @@ function renderLog(){
   const plan=S.plan?.plan||[];
 
   // Find plan for selected date
-  const planDay=plan.find(p=>p.date===date);
+  const planDay=plan.find(p=>{
+    // Compare DD/MM/YYYY - normalize both sides
+    const norm=s=>s.split('/').map(x=>x.padStart(2,'0')).join('/');
+    return norm(p.date)===norm(date);
+  });
   const planMeal=planDay?.meals?.find(m=>m.mealType===meal);
 
   // Build food options for dropdowns:
@@ -512,7 +517,14 @@ function renderTrends(){
     {label:"Triglycerides",current:cur.trig,goals:goals.map(g=>g.trig),years:goals.map(g=>g.year)},
   ];
   return`<div class="pad">
-  <div style="font-size:22px;font-weight:800;margin-bottom:20px">Trends</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div style="font-size:22px;font-weight:800">Trends</div>
+    <button onclick="S.dash=null;go('trends')" style="padding:7px 14px;border-radius:99px;
+      border:1px solid var(--border);background:var(--card);color:var(--accent);
+      font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      &#8635; Refresh
+    </button>
+  </div>
   <div class="card"><div class="ct">Calorie Intake</div><div class="cs">Target: 1,400–1,600 kcal/day</div>
     <div style="height:170px"><canvas id="calChart"></canvas></div></div>
   <div class="card"><div class="ct">Protein Intake</div><div class="cs">Target: 60–80g/day</div>
@@ -724,13 +736,19 @@ function addPlannedItem(name){
 // Convert DD/MM/YYYY to YYYY-MM-DD for date input
 function dateToISO(ddmmyyyy){
   const p=ddmmyyyy.split('/');
-  return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:new Date().toISOString().slice(0,10);
+  if(p.length===3){
+    return p[2]+'-'+String(p[1]).padStart(2,'0')+'-'+String(p[0]).padStart(2,'0');
+  }
+  return new Date().toISOString().slice(0,10);
 }
 
 // Convert YYYY-MM-DD to DD/MM/YYYY
 function isoToDate(iso){
   const p=iso.split('-');
-  return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:S.log.date;
+  if(p.length===3){
+    return String(p[2]).padStart(2,'0')+'/'+String(p[1]).padStart(2,'0')+'/'+p[0];
+  }
+  return S.log.date;
 }
 
 function onDateChange(isoVal){
@@ -762,7 +780,11 @@ function setSlotQty(idx, val){
 function loadPlanIntoSlots(){
   const{meal,date}=S.log;
   const plan=S.plan?.plan||[];
-  const planDay=plan.find(p=>p.date===date);
+  const planDay=plan.find(p=>{
+    // Compare DD/MM/YYYY - normalize both sides
+    const norm=s=>s.split('/').map(x=>x.padStart(2,'0')).join('/');
+    return norm(p.date)===norm(date);
+  });
   const planMeal=planDay?.meals?.find(m=>m.mealType===meal);
   if(!planMeal) return;
   const foods=S.foods?.foods||FOOD_DB_LOCAL;
