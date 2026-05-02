@@ -351,85 +351,95 @@ function renderLog(){
   if(S.logDone) return renderLogDone();
   const{meal,items,date}=S.log;
   const foods=S.foods?.foods||FOOD_DB_LOCAL;
-  const plan=S.plan?.plan||[];
   const past=isPast(date);
+  const isToday=date===todayKey();
 
-  // Plan lookup
+  // Get existing row for this date+meal from plan/records
+  const plan=S.plan?.plan||[];
   const norm=s=>s.split('/').map(x=>x.padStart(2,'0')).join('/');
   const planDay=plan.find(p=>norm(p.date)===norm(date));
   const planMeal=planDay?.meals?.find(m=>m.mealType===meal);
+  const hasExisting=planMeal&&planMeal.items&&planMeal.items.length>0;
 
-  // All foods in dropdown - relevant category first
+  // All foods for dropdown - relevant category first, then all others
   const mealFoods=[
     ...foods.filter(f=>f.category===meal||f.category==='Anytime'),
     ...foods.filter(f=>f.category!==meal&&f.category!=='Anytime')
   ];
 
-  // Build 4 slots
-  const slots=[0,1,2,3].map(i=>{
-    const item=items[i];
-    return{
-      selected: item?.name||'',
-      qty: item?.qty||1,
-      food: item
-    };
-  });
+  // Current slot state
+  const slots=[0,1,2,3].map(i=>({
+    selected: S.log.items[i]?.name||'',
+    qty: S.log.items[i]?.qty||1,
+    food: S.log.items[i]||null
+  }));
 
-  const validItems=items.filter(Boolean);
+  const validItems=(S.log.items||[]).filter(Boolean);
   const totCal=validItems.reduce((s,i)=>s+i.cal*i.qty,0);
   const totPro=validItems.reduce((s,i)=>s+i.protein*i.qty,0);
 
   const blankOpt='<option value="">-- Select food --</option>';
-  const foodOpts=mealFoods.map(f=>`<option value="${f.name.trim()}">${f.name.trim()} (${f.cal} kcal)</option>`).join('');
+
+  // Status label
+  const statusLabel = past
+    ? '<span style="color:var(--warn);font-size:11px">&#128274; Record — edit to correct</span>'
+    : isToday
+      ? '<span style="color:var(--accent);font-size:11px">&#9679; Today — log what you eat</span>'
+      : '<span style="color:var(--blue);font-size:11px">&#9632; Plan — set what you intend to eat</span>';
 
   return`<div class="pad" style="padding-bottom:20px">
-  <div style="font-size:22px;font-weight:800;margin-bottom:20px">Log Meal</div>
+  <div style="font-size:22px;font-weight:800;margin-bottom:16px">Log Meal</div>
 
   <!-- Date picker -->
-  <div style="margin-bottom:16px">
-    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:8px">DATE</div>
+  <div style="margin-bottom:14px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:6px">DATE</div>
     <input type="date" value="${dateToISO(date)}" onchange="onDateChange(this.value)"
       style="width:100%;padding:12px 16px;border-radius:14px;border:1px solid var(--border);
         background:var(--card);color:var(--text);font-family:inherit;font-size:15px;
         font-weight:600;outline:none"/>
+    <div style="margin-top:6px;padding-left:4px">${statusLabel}</div>
   </div>
 
-  <!-- Meal type -->
+  <!-- Meal tabs -->
   <div style="margin-bottom:16px">
-    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:8px">MEAL TYPE</div>
+    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:8px">MEAL</div>
     <div class="prow">
-      ${["Breakfast","Lunch","Dinner","Snack"].map(m=>`<button class="pill${meal===m?' on':''}"
-        onclick="setMeal('${m}')">${m}</button>`).join('')}
+      ${["Breakfast","Lunch","Dinner","Snack"].map(m=>`
+      <button class="pill${meal===m?' on':''}" onclick="setMeal('${m}')">
+        ${m}${S.logStatus&&S.logStatus[date+'_'+m]?' ✓':''}
+      </button>`).join('')}
     </div>
   </div>
 
-  <!-- Past date warning -->
-  ${past?`<div style="background:rgba(255,184,48,0.1);border:1px solid rgba(255,184,48,0.3);
-    border-radius:14px;padding:10px 14px;margin-bottom:14px;color:var(--warn);font-size:12px">
-    &#128274; Past date &mdash; viewing plan only, logging disabled
-  </div>`:''}
-
-  <!-- Plan panel -->
-  ${planMeal&&planMeal.items.length?`
+  <!-- Existing record info -->
+  ${hasExisting?`
   <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);
-    border-radius:16px;padding:14px;margin-bottom:16px">
-    <div style="color:var(--accent);font-size:10px;font-weight:700;letter-spacing:1.5px;margin-bottom:6px">
-      PLANNED ${meal.toUpperCase()} &mdash; ${planDay.dayName} ${date.slice(0,5)}</div>
-    <div style="color:var(--text);font-size:13px;margin-bottom:6px">
-      ${planMeal.items.map(i=>i.food+(i.qty&&i.qty!==1?' x'+i.qty:'')).join(' &middot; ')}</div>
-    <div style="color:var(--accent);font-size:12px;margin-bottom:10px">
-      ${planMeal.mealCal} kcal &middot; ${planMeal.mealProt}g protein</div>
-    ${!past?`<button onclick="loadPlanIntoSlots()"
-      style="padding:7px 16px;border-radius:99px;border:1px solid var(--accent);
+    border-radius:14px;padding:12px 14px;margin-bottom:14px;display:flex;
+    justify-content:space-between;align-items:center">
+    <div>
+      <div style="color:var(--accent);font-size:10px;font-weight:700;letter-spacing:1px;margin-bottom:3px">
+        ${past?'RECORDED':'PLANNED'} ${meal.toUpperCase()}</div>
+      <div style="color:var(--text);font-size:12px">
+        ${planMeal.items.map(i=>i.food+(i.qty>1?' x'+i.qty:'')).join(' &middot; ')}</div>
+      <div style="color:var(--accent);font-size:11px;margin-top:2px">
+        ${planMeal.mealCal} kcal &middot; ${planMeal.mealProt}g protein</div>
+    </div>
+    <button onclick="loadExistingIntoSlots()"
+      style="padding:7px 12px;border-radius:10px;border:1px solid var(--accent);
         background:var(--adim);color:var(--accent);font-size:12px;font-weight:700;
-        cursor:pointer;font-family:inherit">Use planned items &#8594;</button>`:''}
-  </div>`:`<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+        cursor:pointer;font-family:inherit;white-space:nowrap;margin-left:10px">
+      Load &#8594;
+    </button>
+  </div>`:`
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
     padding:10px 14px;margin-bottom:14px;color:var(--muted);font-size:12px">
-    No plan for ${meal} on ${date.slice(0,5)}
+    No ${past?'record':'plan'} for ${meal} on ${date.slice(0,5)}
   </div>`}
 
-  <!-- 4 Dropdown slots -->
-  ${!past?`<div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px">SELECT ITEMS (UP TO 4)</div>
+  <!-- 4 Food slots -->
+  <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px">
+    ${past?'EDIT RECORD (UP TO 4 ITEMS)':'SET ITEMS (UP TO 4)'}
+  </div>
   ${[0,1,2,3].map(i=>{
     const sl=slots[i];
     return`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px">
@@ -441,12 +451,12 @@ function renderLog(){
             font-family:inherit;font-size:13px;outline:none">
           ${blankOpt}
           ${mealFoods.map(f=>`<option value="${f.name.trim()}"
-            ${sl.selected.trim()===f.name.trim()?'selected':''}>${f.name.trim()} (${f.cal} kcal)</option>`).join('')}
+            ${sl.selected.trim()===f.name.trim()?'selected':''}
+            >${f.name.trim()} (${f.cal} kcal)</option>`).join('')}
         </select>
-        <div id="slot-info-${i}" style="color:var(--muted);font-size:10px;margin-top:3px;
-          padding-left:4px;${sl.selected?'':'display:none'}">
-          ${sl.food?sl.food.cal+' kcal &middot; '+sl.food.protein+'g protein &middot; '+(sl.food.portion||''):''}
-        </div>
+        ${sl.food?`<div style="color:var(--muted);font-size:10px;margin-top:3px;padding-left:4px">
+          ${sl.food.cal} kcal &middot; ${sl.food.protein}g protein &middot; ${sl.food.portion||''}
+        </div>`:''}
       </div>
       ${sl.selected?`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px">
         <div style="color:var(--muted);font-size:9px;letter-spacing:1px">QTY</div>
@@ -457,39 +467,45 @@ function renderLog(){
             font-weight:700;text-align:center;font-family:inherit;outline:none"/>
         <button onclick="clearSlot(${i})"
           style="width:58px;padding:3px 0;border-radius:8px;border:1px solid var(--border);
-            background:var(--surface);color:var(--muted);font-size:11px;cursor:pointer;
-            font-family:inherit">&#10005; clear</button>
+            background:var(--surface);color:var(--muted);font-size:11px;
+            cursor:pointer;font-family:inherit">&#10005; clr</button>
       </div>`:''}
     </div>`;
-  }).join('')}`:''}
+  }).join('')}
 
   <!-- Summary -->
   ${validItems.length?`
-  <div id="log-summary" style="background:var(--card);border:1px solid var(--border);
-    border-radius:14px;padding:14px;margin-top:8px;margin-bottom:${!past?'100px':'20px'}">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:14px;margin-top:4px;margin-bottom:90px">
     <div style="color:var(--muted);font-size:10px;letter-spacing:1.5px;margin-bottom:8px">SUMMARY</div>
     ${validItems.map(i=>`
-    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;padding:4px 0;
+      border-bottom:1px solid var(--border)">
       <span style="color:var(--text);font-size:13px">${i.name} x${i.qty}</span>
-      <span style="color:var(--accent);font-size:13px;font-weight:600">${Math.round(i.cal*i.qty)} kcal</span>
+      <span style="color:var(--accent);font-size:13px;font-weight:600">
+        ${Math.round(i.cal*i.qty)} kcal</span>
     </div>`).join('')}
     <div style="display:flex;justify-content:space-between;padding:8px 0 0">
       <span style="color:var(--text);font-weight:700">Total</span>
-      <span style="color:var(--accent);font-weight:800;font-size:16px">${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g P</span>
+      <span style="color:var(--accent);font-weight:800;font-size:16px">
+        ${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g P</span>
     </div>
   </div>`:''}
   </div>
 
-  <!-- Save bar - only for future/today dates with items -->
-  ${validItems.length&&!past?`<div class="logbar">
+  <!-- Save bar -->
+  ${validItems.length?`<div class="logbar">
     <div>
-      <div class="bar-kcal" style="color:var(--accent);font-weight:800;font-size:18px">
+      <div style="color:var(--accent);font-weight:800;font-size:18px">
         ${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g</div>
-      <div style="color:var(--muted);font-size:11px">${meal} &mdash; ${date.slice(0,5)}</div>
+      <div style="color:var(--muted);font-size:11px">
+        ${meal} &mdash; ${date.slice(0,5)} &mdash; ${past?'Update record':'Save'}</div>
     </div>
-    <button onclick="submitLog()" style="background:var(--accent);border:none;
-      border-radius:12px;padding:11px 22px;color:#0A0F1E;font-weight:800;
-      font-size:14px;cursor:pointer;font-family:inherit">Save &#8594;</button>
+    <button onclick="submitLog()"
+      style="background:var(--accent);border:none;border-radius:12px;
+        padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;
+        cursor:pointer;font-family:inherit">
+      ${past?'Update &#8594;':'Save &#8594;'}</button>
   </div>`:''}`;
 }
 function renderLogDone(){
@@ -596,7 +612,7 @@ function renderFoods(){
         <select oninput="S.addFood.category=this.value"
           style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
             background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none">
-          ${["Breakfast","Lunch","Dinner","Snack"].map(c=>
+          ${["Breakfast","Lunch","Dinner","Snack","Anytime"].map(c=>
             `<option value="${c}" ${af.category===c?"selected":""}>${c}</option>`).join("")}
         </select>
       </div>
@@ -846,7 +862,6 @@ function loadPlanIntoSlots(){
 function setMeal(m){
   S.log.meal=m;
   S.log.items=[null,null,null,null];
-  S.log.search='';
   reLog();
 }
 
@@ -865,9 +880,71 @@ function setFF(f){
   reFoods();
 }
 
+function onDateChange(isoVal){
+  S.log.date=isoToDate(isoVal);
+  S.log.items=[null,null,null,null];
+  S.log.meal='Breakfast';
+  reLog();
+}
+
+function setSlotFood(idx, name){
+  if(!name) return;
+  if(!S.log.items||S.log.items.length<4) S.log.items=[null,null,null,null];
+  const current=S.log.items[idx]?S.log.items[idx].name:'';
+  if(name.trim()===current.trim()) return; // debounce
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  const n=name.trim().toLowerCase();
+  const food=foods.find(f=>f.name.trim().toLowerCase()===n);
+  const prevQty=S.log.items[idx]?.qty||1;
+  S.log.items[idx]=food
+    ? {...food, qty:prevQty}
+    : {name:name.trim(), cal:0, protein:0, category:'', portion:'', qty:prevQty};
+  reLog();
+}
+
+function setSlotQty(idx, val){
+  if(S.log.items&&S.log.items[idx]){
+    S.log.items[idx].qty=parseFloat(val)||1;
+    reLog();
+  }
+}
+
+function clearSlot(idx){
+  if(S.log.items) S.log.items[idx]=null;
+  reLog();
+}
+
+function loadExistingIntoSlots(){
+  const{meal,date}=S.log;
+  const plan=S.plan?.plan||[];
+  const norm=s=>s.split('/').map(x=>x.padStart(2,'0')).join('/');
+  const planDay=plan.find(p=>norm(p.date)===norm(date));
+  const planMeal=planDay?.meals?.find(m=>m.mealType===meal);
+  if(!planMeal||!planMeal.items.length) return;
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  S.log.items=[null,null,null,null];
+  const seen=new Set();
+  let si=0;
+  planMeal.items.forEach(pi=>{
+    if(si>=4) return;
+    const key=pi.food.trim().toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    const food=foods.find(f=>f.name.trim().toLowerCase()===key)
+      ||{name:pi.food.trim(),cal:0,protein:0,category:meal,portion:'1 serving'};
+    S.log.items[si]={...food,qty:pi.qty||1};
+    si++;
+  });
+  reLog();
+}
+
+// Legacy alias
+function loadPlanIntoSlots(){ loadExistingIntoSlots(); }
+
 function resetLog(){
   const d=S.log.date;
-  S.log={meal:'Breakfast',items:[null,null,null,null],search:'',date:d};
+  const m=S.log.meal;
+  S.log={meal:m,items:[null,null,null,null],date:d};
   S.logDone=false;
   S.logResult=null;
   reLog();
@@ -881,14 +958,17 @@ function resetMetrics(){
 
 async function submitLog(){
   const{meal,items,date}=S.log;
-  const validItems=items.filter(Boolean);
+  const validItems=(items||[]).filter(Boolean);
   if(!validItems.length) return;
   const totalCal=Math.round(validItems.reduce((s,i)=>s+i.cal*i.qty,0));
   const totalProtein=Math.round(validItems.reduce((s,i)=>s+i.protein*i.qty,0));
+
   const el=document.getElementById('scr');
   el.innerHTML=`<div style="padding:calc(100px + var(--safe-t)) 16px;text-align:center">
-    ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">Writing to Drive...</div>
-    <div style="color:var(--muted);font-size:13px;margin-top:6px">Updating Plan&amp;Rec + Dashboard</div></div>`;
+    ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">
+    ${isPast(date)?'Updating record...':'Saving to Drive...'}</div>
+    <div style="color:var(--muted);font-size:13px;margin-top:6px">Writing to Sheets</div></div>`;
+
   let result;
   if(isSetup()){
     result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};
@@ -899,16 +979,19 @@ async function submitLog(){
         dayName:getDay(S.log.date),
         mealType:meal,
         items:validItems.map(i=>({food:i.name,qty:i.qty,cal:i.cal,protein:i.protein})),
-        totalCal,totalProtein
+        totalCal,
+        totalProtein,
+        overwrite:true  // always overwrite existing row
       });
     }catch(e){
-      result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};
+      result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein,error:e.message};
     }
   }
+
   S.logResult=result;
   S.logDone=true;
   S.today=null;
-  S.plan=null;
+  S.plan=null; // force refresh
   el.innerHTML=renderLogDone();
 }
 
@@ -917,7 +1000,8 @@ async function submitMetrics(){
   if(!weight&&!hba1c&&!ldl&&!trig) return;
   const el=document.getElementById('scr');
   el.innerHTML=`<div style="padding:calc(100px + var(--safe-t)) 16px;text-align:center">
-    ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">Updating Drive...</div></div>`;
+    ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">
+    Updating Drive...</div></div>`;
   if(!isSetup()){
     try{
       await api('logMetrics',{
@@ -948,9 +1032,9 @@ async function submitAddFood(){
   S.addFood.saving=true; S.addFood.error=''; reFoods();
   const body={
     category:af.category, name:af.name.trim(),
-    portion:af.portion.trim()||'1 serving',
+    portion:af.portion||'1 serving',
     cal:parseFloat(af.cal)||0, protein:parseFloat(af.protein)||0,
-    glycemic:af.glycemic, remark:af.remark
+    glycemic:af.glycemic||'', remark:af.remark||''
   };
   if(isSetup()){
     if(!S.foods) S.foods={foods:[...FOOD_DB_LOCAL]};
@@ -972,7 +1056,7 @@ async function submitAddFood(){
     }
   }catch(e){
     S.addFood.saving=false;
-    S.addFood.error='Network error. Check connection.';
+    S.addFood.error='Network error: '+e.message;
   }
   reFoods();
 }
