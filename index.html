@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="HealthTrack"/>
 <link rel="manifest" href="./manifest.json"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💚</text></svg>"/>
 <title>HealthTrack</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 
@@ -388,7 +389,15 @@ function renderLog(){
       : '<span style="color:var(--blue);font-size:11px">&#9632; Plan — set what you intend to eat</span>';
 
   return`<div class="pad" style="padding-bottom:20px">
-  <div style="font-size:22px;font-weight:800;margin-bottom:16px">Log Meal</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div style="font-size:22px;font-weight:800">Log Meal</div>
+    <button onclick="refreshLogData()"
+      style="padding:7px 14px;border-radius:99px;border:1px solid var(--border);
+        background:var(--card);color:var(--accent);font-size:12px;font-weight:700;
+        cursor:pointer;font-family:inherit" id="refresh-btn">
+      &#8635; Refresh
+    </button>
+  </div>
 
   <!-- Date picker -->
   <div style="margin-bottom:14px">
@@ -858,6 +867,18 @@ function loadPlanIntoSlots(){
 }
 
 // ── Action functions ─────────────────────────────────────────
+
+
+async function refreshLogData(){
+  const btn = document.getElementById('refresh-btn');
+  if(btn){ btn.textContent='Refreshing...'; btn.disabled=true; }
+  // Force reload plan and today data
+  S.plan=null;
+  S.today=null;
+  S.foods=null; // also reload food DB in case new items added
+  await Promise.all([loadPlan(), loadFoods(), loadToday()]);
+  reLog();
+}
 
 function setMeal(m){
   S.log.meal=m;
