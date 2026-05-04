@@ -174,6 +174,7 @@ let S={
   foodFilter:"All",
   metrics:{weight:"",hba1c:"",ldl:"",trig:""},
   metricsDone:false,
+  lastSave:null,
   addFood:{show:false,name:"",category:"Snack",portion:"1 serving",cal:"",protein:"",glycemic:"",remark:"",saving:false,error:"",done:false},
   charts:{},
 };
@@ -291,7 +292,7 @@ async function _go(screen){
   killCharts();
   const el=document.getElementById("scr");
   el.innerHTML=ld(); el.scrollTop=0;
-  if(screen==="home"){S.today=null;await Promise.all([loadDash(),loadToday()]);el.innerHTML=renderHome();requestAnimationFrame(buildSparkline);}
+  if(screen==="home"){S.today=null;await Promise.all([loadDash(),loadToday(),loadPlan()]);el.innerHTML=renderHome();}
   else if(screen==="log"){await Promise.all([loadFoods(),loadPlan()]);el.innerHTML=renderLog();}
   else if(screen==="trends"){S.dash=null;await loadDash();el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();});}
   else if(screen==="foods"){await loadFoods();el.innerHTML=renderFoods();}
@@ -300,46 +301,102 @@ async function _go(screen){
 
 // ── Screens ───────────────────────────────────────────────────
 function renderHome(){
-  const d=S.dash,t=S.today;
+  const d=S.dash, t=S.today;
   const cur=d?.current||{weight:95.3,hba1c:7,ldl:186,trig:220};
   const g0=(d?.goals||[])[0]||{year:"Dec'26",weight:90,hba1c:6.5,ldl:150,trig:175};
-  const kcal=t?.dailyKcal||0,prot=t?.dailyProt||0,budget=Math.max(0,1600-kcal);
+  const kcal=t?.dailyKcal||0, prot=t?.dailyProt||0;
+  const budget=Math.max(0,1600-kcal);
   const actuals=(d?.actuals||[]).filter(a=>a.kcalIn>0);
-  const avg=actuals.length?Math.round(actuals.reduce((s,a)=>s+a.kcalIn,0)/actuals.length):0;
+
+  // Tomorrow's plan from S.plan
+  const plan=S.plan?.plan||[];
+  const norm=s=>s.split('/').map(x=>x.padStart(2,'0')).join('/');
+  const tmrDate=(()=>{const n=new Date();n.setDate(n.getDate()+1);
+    return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})();
+  const tmrDay=(()=>{const n=new Date();n.setDate(n.getDate()+1);
+    return n.toLocaleDateString('en-GB',{weekday:'long'});})();
+  const tmrPlan=plan.find(p=>norm(p.date)===norm(tmrDate));
+  const tmrMeals=tmrPlan?.meals||[];
+  const tmrKcal=tmrMeals.reduce((s,m)=>s+m.mealCal,0);
+  const tmrProt=tmrMeals.reduce((s,m)=>s+m.mealProt,0);
+
   return`<div class="pad">
-  ${isSetup() ? '<div class="setup fu">&#9881;&#65039; <strong>Sample data</strong> &mdash; Drive not connected. <span onclick="showSetupPopup()" style="color:#00E5A0;text-decoration:underline;cursor:pointer">Connect now</span></div>' : '<div style="background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#00E5A0;display:flex;justify-content:space-between;align-items:center"><span>&#10003; Connected to Drive</span><span onclick="resetApiUrl()" style="color:#6B7A9F;cursor:pointer;font-size:11px">Change URL</span></div>'}
+  ${isSetup()?`<div class="setup fu">&#9881;&#65039; <strong>Sample data</strong> &mdash; Drive not connected.
+    <span onclick="showSetupPopup()" style="color:var(--accent);text-decoration:underline;cursor:pointer">
+    Connect now</span></div>`:`
+  <div style="background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:12px;
+    padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--accent);
+    display:flex;justify-content:space-between;align-items:center" class="fu">
+    <span>&#10003; Connected to Drive</span>
+    <span onclick="resetApiUrl()" style="color:var(--muted);cursor:pointer;font-size:11px">Change URL</span>
+  </div>`}
+
+  <!-- Header -->
   <div style="padding-bottom:20px" class="fu">
     <div style="color:var(--muted);font-size:11px;letter-spacing:2px;text-transform:uppercase">${dayStr()}</div>
-    <div style="font-size:26px;font-weight:800;margin-top:4px">${greet()} 👋</div>
+    <div style="font-size:26px;font-weight:800;margin-top:4px">${greet()} &#128075;</div>
   </div>
-  <div class="card fu" style="background:linear-gradient(135deg,var(--card),#1A2240);box-shadow:0 0 40px rgba(0,229,160,0.07)">
+
+  <!-- Today rings -->
+  <div class="card fu" style="background:linear-gradient(135deg,var(--card),#1A2240);
+    box-shadow:0 0 40px rgba(0,229,160,0.07);margin-bottom:14px">
     <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:16px">TODAY'S INTAKE</div>
     <div style="display:flex;justify-content:space-around">
-      ${ring(kcal,1600,kcal>1800?'var(--orange)':'var(--accent)',"kcal","CALORIES")}
-      ${ring(prot,80,"var(--blue)","protein","GRAMS")}
-      ${ring(budget,1600,"var(--purple)","budget","LEFT")}
+      ${ring(kcal,1600,kcal>1800?'var(--orange)':'var(--accent)','kcal','CALORIES')}
+      ${ring(prot,80,'var(--blue)','protein','GRAMS')}
+      ${ring(budget,1600,'var(--purple)','budget','LEFT')}
     </div>
-    ${t?.meals?.length?`<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
-      ${t.meals.map(m=>`<div style="display:flex;justify-content:space-between;padding:4px 0">
+    ${t?.meals?.length?`
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+      ${t.meals.map(m=>`
+      <div style="display:flex;justify-content:space-between;padding:4px 0">
         <span style="color:var(--muted);font-size:12px">${m.mealType}</span>
-        <span style="color:var(--text);font-size:12px">${fmt(m.mealCal)} kcal · ${m.mealProt}g protein</span>
-      </div>`).join("")}</div>`:""}
+        <span style="color:var(--text);font-size:12px">${fmt(m.mealCal)} kcal &middot; ${m.mealProt}g protein</span>
+      </div>`).join('')}
+    </div>`:'<div style="color:var(--muted);font-size:12px;text-align:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">No meals logged yet today</div>'}
   </div>
-  ${isSetup() ? `<button onclick="showSetupPopup()" style="width:100%;padding:13px;border-radius:14px;
-    border:1px solid #00E5A0;background:rgba(0,229,160,0.08);color:#00E5A0;font-weight:700;
-    font-size:14px;font-family:inherit;cursor:pointer;margin-bottom:14px">
-    &#128279; Connect to Drive</button>` : ''}
-  <button class="btn fu" onclick="go('log')" style="margin-bottom:14px">&#10010;  Log a Meal</button>
-  <div class="card fu">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <span class="ct">Calorie Trend</span>
-      <span style="color:var(--muted);font-size:12px">avg ${fmt(avg)} kcal</span>
+
+  <!-- Tomorrow plan -->
+  <div class="card fu" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:2px">TOMORROW'S PLAN</div>
+        <div style="color:var(--text);font-size:13px;margin-top:2px">${tmrDay}</div>
+      </div>
+      ${tmrKcal>0?`<div style="text-align:right">
+        <div style="color:var(--blue);font-weight:700;font-size:16px">${fmt(tmrKcal)}</div>
+        <div style="color:var(--muted);font-size:11px">kcal planned</div>
+      </div>`:''}
     </div>
-    <div class="cs">1,600 kcal daily target</div>
-    <div style="height:120px"><canvas id="sparkChart"></canvas></div>
+    ${tmrMeals.filter(m=>m.items&&m.items.length>0).length>0?`
+    ${tmrMeals.filter(m=>m.items&&m.items.length>0).map(m=>`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;
+      padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1">
+        <div style="color:var(--text);font-size:12px;font-weight:600;margin-bottom:3px">${m.mealType}</div>
+        <div style="color:var(--muted);font-size:11px">
+          ${m.items.map(i=>i.food+(i.qty>1?' x'+i.qty:'')).join(' &middot; ')}
+        </div>
+      </div>
+      <div style="color:var(--blue);font-size:12px;font-weight:600;margin-left:10px;white-space:nowrap">
+        ${m.mealCal} kcal
+      </div>
+    </div>`).join('')}
+    ${tmrProt>0?`<div style="display:flex;justify-content:space-between;padding:8px 0 0">
+      <span style="color:var(--muted);font-size:12px">Total protein</span>
+      <span style="color:var(--blue);font-size:12px;font-weight:600">${tmrProt}g</span>
+    </div>`:''}
+    `:`
+    <div style="color:var(--muted);font-size:12px;text-align:center;padding:12px 0">
+      No plan yet for tomorrow &mdash;
+      <span onclick="_go('log')" style="color:var(--accent);cursor:pointer;text-decoration:underline">
+        Plan now</span>
+    </div>`}
   </div>
+
+  <!-- Goals -->
   <div class="card fu">
-    <div class="ct" style="margin-bottom:16px">Goals — ${g0.year}</div>
+    <div class="ct" style="margin-bottom:16px">Goals &mdash; ${g0.year}</div>
     ${goalBar("Weight",cur.weight,g0.weight,"kg")}
     ${goalBar("HbA1c",cur.hba1c,g0.hba1c,"%")}
     ${goalBar("LDL",cur.ldl,g0.ldl,"mg/dL")}
@@ -347,7 +404,6 @@ function renderHome(){
   </div>
   </div>`;
 }
-
 function renderLog(){
   if(S.logDone) return renderLogDone();
   const{meal,items,date}=S.log;
@@ -398,6 +454,26 @@ function renderLog(){
       &#8635; Refresh
     </button>
   </div>
+
+  <!-- Success toast -->
+  ${S.lastSave&&(Date.now()-S.lastSave.ts<30000)?`
+  <div style="background:var(--adim);border:1px solid var(--accent);border-radius:16px;
+    padding:14px 16px;margin-bottom:16px;animation:fadeUp .3s ease">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div style="color:var(--accent);font-weight:700;font-size:14px;margin-bottom:4px">
+          &#10003; ${S.lastSave.mealType} saved!</div>
+        <div style="color:var(--text);font-size:13px">
+          ${fmt(S.lastSave.totalCal)} kcal &middot; ${S.lastSave.totalProtein}g protein</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:3px">
+          Day total: ${fmt(S.lastSave.dayKcal)} kcal &middot; ${S.lastSave.dayProt}g P
+          &nbsp;&middot;&nbsp; ${Math.max(0,1600-S.lastSave.dayKcal)} kcal remaining</div>
+      </div>
+      <button onclick="S.lastSave=null;reLog()"
+        style="background:none;border:none;color:var(--muted);font-size:16px;
+          cursor:pointer;padding:0;line-height:1">&#10005;</button>
+    </div>
+  </div>`:''}
 
   <!-- Date picker -->
   <div style="margin-bottom:14px">
@@ -984,6 +1060,7 @@ async function submitLog(){
   const totalCal=Math.round(validItems.reduce((s,i)=>s+i.cal*i.qty,0));
   const totalProtein=Math.round(validItems.reduce((s,i)=>s+i.protein*i.qty,0));
 
+  // Show saving indicator inline
   const el=document.getElementById('scr');
   el.innerHTML=`<div style="padding:calc(100px + var(--safe-t)) 16px;text-align:center">
     ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">
@@ -1002,18 +1079,37 @@ async function submitLog(){
         items:validItems.map(i=>({food:i.name,qty:i.qty,cal:i.cal,protein:i.protein})),
         totalCal,
         totalProtein,
-        overwrite:true  // always overwrite existing row
+        overwrite:true
       });
     }catch(e){
       result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein,error:e.message};
     }
   }
 
-  S.logResult=result;
-  S.logDone=true;
+  // Store last save result for toast
+  S.lastSave={
+    mealType:meal,
+    totalCal,
+    totalProtein,
+    dayKcal:result.dayKcal||totalCal,
+    dayProt:result.dayProt||totalProtein,
+    error:result.error||null,
+    ts:Date.now()
+  };
+
+  // Clear slots for next meal, keep date and advance to next meal
+  S.log.items=[null,null,null,null];
+  const meals=["Breakfast","Lunch","Dinner","Snack"];
+  const nextMeal=meals[(meals.indexOf(meal)+1)%meals.length];
+  S.log.meal=nextMeal;
+
+  // Force reload plan and today from Sheets
   S.today=null;
-  S.plan=null; // force refresh
-  el.innerHTML=renderLogDone();
+  S.plan=null;
+  await Promise.all([loadPlan(),loadToday()]);
+
+  // Re-render log page (stays on same page)
+  reLog();
 }
 
 async function submitMetrics(){
