@@ -232,16 +232,24 @@ async function loadFoods(){
 }
 
 async function loadPlan(){
-  if(S.plan) return;
+  // Always fetch fresh - plan changes frequently
   if(isSetup()){S.plan={plan:[]};return;}
-  const d=await api("plan");
-  S.plan=(d&&!d.error)?d:{plan:[]};
+  try{
+    const d=await api("plan");
+    S.plan=(d&&!d.error)?d:{plan:[]};
+  }catch(e){
+    if(!S.plan) S.plan={plan:[]};
+  }
 }
 async function loadToday(){
-  if(S.today) return;
+  // Always fetch fresh
   if(isSetup()){S.today={meals:[],dailyKcal:0,dailyProt:0};return;}
-  const d=await api("today");
-  S.today=(d&&!d.error)?d:{meals:[],dailyKcal:0,dailyProt:0};
+  try{
+    const d=await api("today");
+    S.today=(d&&!d.error)?d:{meals:[],dailyKcal:0,dailyProt:0};
+  }catch(e){
+    if(!S.today) S.today={meals:[],dailyKcal:0,dailyProt:0};
+  }
 }
 
 function tagH(food){
@@ -293,7 +301,7 @@ async function _go(screen){
   const el=document.getElementById("scr");
   el.innerHTML=ld(); el.scrollTop=0;
   if(screen==="home"){S.today=null;await Promise.all([loadDash(),loadToday(),loadPlan()]);el.innerHTML=renderHome();}
-  else if(screen==="log"){await Promise.all([loadFoods(),loadPlan()]);el.innerHTML=renderLog();}
+  else if(screen==="log"){S.plan=null;await Promise.all([loadFoods(),loadPlan()]);el.innerHTML=renderLog();}
   else if(screen==="trends"){S.dash=null;await loadDash();el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();});}
   else if(screen==="foods"){await loadFoods();el.innerHTML=renderFoods();}
   else if(screen==="metrics"){el.innerHTML=renderMetrics();}
@@ -964,7 +972,17 @@ function setMeal(m){
 
 function reLog(){
   const el=document.getElementById('scr');
-  if(el) el.innerHTML=renderLog();
+  if(el){
+    el.innerHTML=renderLog();
+    // Force-set select values after render (fixes Android display bug)
+    requestAnimationFrame(()=>{
+      (S.log.items||[]).forEach((item,i)=>{
+        if(!item) return;
+        const sel=el.querySelector('select:nth-of-type('+(i+1)+')');
+        if(sel && item.name) sel.value=item.name.trim();
+      });
+    });
+  }
 }
 
 function reFoods(){
