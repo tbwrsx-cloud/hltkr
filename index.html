@@ -1425,6 +1425,23 @@ function removeUploadedFile(type, idx){
 }
 
 // ── Render Wellness ───────────────────────────────────────────
+
+function resetWellnessForm(){
+  const now=new Date();
+  const today=String(now.getDate()).padStart(2,'0')+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+now.getFullYear();
+  S.wellness.showHistory=false;
+  S.wellness.date=today;
+  S.wellness.doctor='';
+  S.wellness.cause='';
+  S.wellness.notes='';
+  S.wellness.symptoms=Array(5).fill(null).map(()=>({part:'',side:'',type:''}));
+  S.wellness.medicines=Array(5).fill(null).map(()=>({name:'',dose:'',freq:'',duration:''}));
+  S.wellness.prescriptionLinks=[];
+  S.wellness.reportLinks=[];
+  S.wellness.done=false;
+  S.wellness.error='';
+  reWellness();
+}
 function reWellness(){
   const el=document.getElementById('scr');
   if(el) el.innerHTML=renderWellness();
@@ -1510,7 +1527,7 @@ function renderWellness(){
 
   <!-- Toggle form/history -->
   <div style="display:flex;gap:8px;margin-bottom:16px">
-    <button onclick="S.wellness.showHistory=false;reWellness()"
+    <button onclick="resetWellnessForm()"
       style="flex:1;padding:10px;border-radius:12px;border:none;cursor:pointer;font-family:inherit;
         font-size:13px;font-weight:${!w.showHistory?700:400};
         background:${!w.showHistory?'var(--accent)':'var(--card)'};
