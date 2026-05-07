@@ -181,7 +181,7 @@ let S={
     doctor:'', cause:'', notes:'',
     symptoms:[{part:'',side:'',type:''},{part:'',side:'',type:''},{part:'',side:'',type:''},{part:'',side:'',type:''},{part:'',side:'',type:''}],
     medicines:[{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''}],
-    prescriptionLink:'', reportLink:'',
+    prescriptionLinks:[], reportLinks:[],
     saving:false, done:false, error:'',
     entries:null, showHistory:false,
     driveToken:'', folderId:''
@@ -1352,15 +1352,76 @@ async function uploadToDrive(file, type){
   return null;
 }
 
-async function handleFileUpload(input, type){
-  const file=input.files[0];
-  if(!file) return;
-  const link=await uploadToDrive(file,type);
-  if(link){
-    if(type==='prescription') S.wellness.prescriptionLink=link;
-    else S.wellness.reportLink=link;
-    reWellness();
+async function handleMultiFileUpload(input, type){
+  const files=Array.from(input.files);
+  if(!files.length) return;
+  const statusEl=document.getElementById('upload-status-'+type);
+  if(statusEl) statusEl.textContent='Uploading '+files.length+' file'+(files.length>1?'s':'')+'...';
+
+  const token=await initGoogleAuth();
+  if(!token) return; // will redirect for auth
+
+  const folderId=await ensureDriveFolder();
+  const results=[];
+
+  for(let i=0;i<files.length;i++){
+    const file=files[i];
+    if(statusEl) statusEl.textContent='Uploading '+(i+1)+' of '+files.length+'...';
+    try{
+      const base64=await new Promise((res,rej)=>{
+        const reader=new FileReader();
+        reader.onload=e=>res(e.target.result.split(',')[1]);
+        reader.onerror=rej;
+        reader.readAsDataURL(file);
+      });
+      const meta=JSON.stringify({
+        name:type+'_'+S.wellness.date.replace(/\//g,'-')+'_'+file.name,
+        parents:folderId?[folderId]:[]
+      });
+      const boundary='bound'+Date.now();
+      const parts=['--'+boundary,'Content-Type: application/json','',meta,
+        '--'+boundary,'Content-Type: '+file.type,
+        'Content-Transfer-Encoding: base64','',base64,'--'+boundary+'--'];
+      const body=parts.join('\r\n');
+      const resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+        method:'POST',
+        headers:{
+          'Authorization':'Bearer '+token,
+          'Content-Type':'multipart/related; boundary='+boundary
+        },
+        body
+      });
+      const data=await resp.json();
+      if(data.id){
+        await fetch('https://www.googleapis.com/drive/v3/files/'+data.id+'/permissions',{
+          method:'POST',
+          headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+          body:JSON.stringify({role:'reader',type:'anyone'})
+        });
+        results.push({
+          name:file.name,
+          url:'https://drive.google.com/file/d/'+data.id+'/view'
+        });
+      }
+    }catch(e){
+      console.error('Upload error:',e);
+    }
   }
+
+  if(results.length){
+    if(type==='prescription') S.wellness.prescriptionLinks=[...S.wellness.prescriptionLinks,...results];
+    else S.wellness.reportLinks=[...S.wellness.reportLinks,...results];
+    if(statusEl) statusEl.textContent='✓ '+results.length+' file'+(results.length>1?'s':'')+' uploaded';
+  } else {
+    if(statusEl) statusEl.textContent='Upload failed. Try again.';
+  }
+  reWellness();
+}
+
+function removeUploadedFile(type, idx){
+  if(type==='prescription') S.wellness.prescriptionLinks.splice(idx,1);
+  else S.wellness.reportLinks.splice(idx,1);
+  reWellness();
 }
 
 // ── Render Wellness ───────────────────────────────────────────
@@ -1523,38 +1584,46 @@ function renderWellness(){
   </div>
 
   <!-- File uploads -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
-      <div style="font-size:24px;margin-bottom:6px">📋</div>
-      <div style="color:var(--text);font-size:12px;font-weight:600;margin-bottom:4px">Prescription</div>
-      ${w.prescriptionLink?`<div style="color:var(--accent);font-size:10px;margin-bottom:6px">✓ Uploaded</div>
-        <a href="${w.prescriptionLink}" target="_blank"
-          style="color:var(--accent);font-size:10px;text-decoration:underline">View</a>`:
-        `<div id="upload-status-prescription" style="color:var(--muted);font-size:10px;margin-bottom:6px"></div>`}
-      <label style="display:block;margin-top:8px;padding:7px 12px;border-radius:10px;
-        background:var(--surface);border:1px solid var(--border);color:var(--muted);
-        font-size:12px;cursor:pointer">
-        ${w.prescriptionLink?'Replace':'Upload'}
-        <input type="file" accept="image/*,.pdf" style="display:none"
-          onchange="handleFileUpload(this,'prescription')"/>
-      </label>
-    </div>
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
-      <div style="font-size:24px;margin-bottom:6px">🔬</div>
-      <div style="color:var(--text);font-size:12px;font-weight:600;margin-bottom:4px">Test Report</div>
-      ${w.reportLink?`<div style="color:var(--accent);font-size:10px;margin-bottom:6px">✓ Uploaded</div>
-        <a href="${w.reportLink}" target="_blank"
-          style="color:var(--accent);font-size:10px;text-decoration:underline">View</a>`:
-        `<div id="upload-status-report" style="color:var(--muted);font-size:10px;margin-bottom:6px"></div>`}
-      <label style="display:block;margin-top:8px;padding:7px 12px;border-radius:10px;
-        background:var(--surface);border:1px solid var(--border);color:var(--muted);
-        font-size:12px;cursor:pointer">
-        ${w.reportLink?'Replace':'Upload'}
-        <input type="file" accept="image/*,.pdf" style="display:none"
-          onchange="handleFileUpload(this,'report')"/>
-      </label>
-    </div>
-  </div>
+  ${['prescription','report'].map(type=>{
+    const icon=type==='prescription'?'📋':'🔬';
+    const label=type==='prescription'?'Prescription':'Test Report';
+    const links=type==='prescription'?w.prescriptionLinks:w.reportLinks;
+    return`<div style="background:var(--card);border:1px solid var(--border);
+      border-radius:14px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:20px">${icon}</span>
+          <span style="color:var(--text);font-size:14px;font-weight:600">${label}</span>
+          ${links.length?`<span style="background:var(--adim);color:var(--accent);
+            font-size:10px;padding:2px 8px;border-radius:99px;font-weight:700">
+            ${links.length} file${links.length>1?'s':''}</span>`:''}
+        </div>
+        <label style="padding:7px 14px;border-radius:10px;cursor:pointer;
+          background:var(--accent);border:none;color:#0A0F1E;
+          font-size:12px;font-weight:700;font-family:inherit">
+          + Add
+          <input type="file" accept="image/*,.pdf" multiple style="display:none"
+            onchange="handleMultiFileUpload(this,'${type}')"/>
+        </label>
+      </div>
+      <div id="upload-status-${type}" style="color:var(--muted);font-size:11px;margin-bottom:6px"></div>
+      ${links.length?`<div style="display:flex;flex-direction:column;gap:6px">
+        ${links.map((link,i)=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;
+          padding:8px 10px;background:var(--surface);border-radius:10px;
+          border:1px solid var(--border)">
+          <a href="${link.url}" target="_blank"
+            style="color:var(--accent);font-size:12px;text-decoration:none;flex:1;
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            &#128279; ${link.name||'File '+(i+1)}
+          </a>
+          <button onclick="removeUploadedFile('${type}',${i})"
+            style="background:none;border:none;color:var(--muted);cursor:pointer;
+              font-size:14px;padding:0 4px;flex-shrink:0">&#10005;</button>
+        </div>`).join('')}
+      </div>`:'<div style="color:var(--muted);font-size:11px">No files uploaded yet</div>'}
+    </div>`;
+  }).join('')}
 
   ${w.error?`<div style="color:var(--danger);font-size:13px;margin-bottom:12px">&#10007; ${w.error}</div>`:''}
   `}
@@ -1586,8 +1655,8 @@ function loadWellnessEntry(date){
     ...S.wellness,
     date:entry.date, doctor:entry.doctor, cause:entry.cause,
     notes:entry.notes, symptoms:syms, medicines:meds,
-    prescriptionLink:entry.prescriptionLink,
-    reportLink:entry.reportLink,
+    prescriptionLinks:entry.prescriptionLinks||[],
+    reportLinks:entry.reportLinks||[],
     showHistory:false, done:false, error:''
   };
   reWellness();
@@ -1609,7 +1678,7 @@ async function submitWellness(){
     const r=await api('logWellness',{
       date:w.date, doctor:w.doctor, cause:w.cause, notes:w.notes,
       symptoms:w.symptoms, medicines:w.medicines,
-      prescriptionLink:w.prescriptionLink, reportLink:w.reportLink
+      prescriptionLinks:w.prescriptionLinks, reportLinks:w.reportLinks
     });
     if(r&&r.success){
       S.wellness.saving=false; S.wellness.done=true;
@@ -1622,7 +1691,7 @@ async function submitWellness(){
           doctor:'',cause:'',notes:'',
           symptoms:Array(5).fill(null).map(()=>({part:'',side:'',type:''})),
           medicines:Array(5).fill(null).map(()=>({name:'',dose:'',freq:'',duration:''})),
-          prescriptionLink:'',reportLink:'',done:false
+          prescriptionLinks:[],reportLinks:[],done:false
         };
         reWellness();
       },2000);
