@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#0A0F1E"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="HealthTrack"/>
+<link rel="manifest" href="./manifest.json"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💚</text></svg>"/>
+<title>HealthTrack</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+
+<style>
+:root{
+  --bg:#0A0F1E;--surface:#111827;--card:#161D2F;--border:#1E2A45;
+  --accent:#00E5A0;--adim:rgba(0,229,160,0.12);
+  --orange:#FF6B35;--blue:#4A9FFF;--purple:#A78BFA;
+  --text:#F0F4FF;--muted:#6B7A9F;--warn:#FFB830;
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{background:var(--bg);color:var(--text);font-family:'Sora',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  height:100%;overflow:hidden;overscroll-behavior:none;}
+#app{height:100vh;height:100dvh;display:flex;flex-direction:column;max-width:430px;margin:0 auto;}
+.screen{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:calc(76px + var(--safe-b));}
+.screen::-webkit-scrollbar{display:none;}
+.pad{padding:calc(48px + var(--safe-t)) 16px 0;}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:430px;background:var(--surface);
+  border-top:1px solid var(--border);display:flex;
+  padding:8px 0 calc(8px + var(--safe-b));z-index:200;}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;
+  gap:3px;background:none;border:none;cursor:pointer;padding:4px 0;}
+.nb:active{opacity:.7;}
+.ni{font-size:20px;color:var(--muted);transition:color .2s;}
+.nl{font-size:9px;letter-spacing:.5px;color:var(--muted);font-weight:400;}
+.nb.on .ni,.nb.on .nl{color:var(--accent);}
+.nb.on .nl{font-weight:700;}
+.card{background:var(--card);border-radius:20px;padding:18px;
+  border:1px solid var(--border);margin-bottom:14px;}
+.ct{color:var(--text);font-weight:700;font-size:14px;margin-bottom:4px;}
+.cs{color:var(--muted);font-size:11px;margin-bottom:14px;}
+.pill{padding:7px 16px;border-radius:99px;border:none;cursor:pointer;
+  white-space:nowrap;font-size:12px;font-family:'Sora',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--card);color:var(--muted);transition:all .2s;}
+.pill.on{background:var(--accent);color:#0A0F1E;font-weight:700;}
+.prow{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;
+  scrollbar-width:none;margin-bottom:16px;}
+.prow::-webkit-scrollbar{display:none;}
+input[type=text],input[type=number]{background:var(--card);border:1px solid var(--border);
+  border-radius:12px;color:var(--text);font-family:'Sora',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:14px;padding:12px 16px;outline:none;transition:border-color .2s;}
+input:focus{border-color:var(--accent);}
+input[type=number]{width:58px;text-align:center;padding:6px 8px;border-radius:8px;}
+.btn{width:100%;padding:16px;border-radius:16px;border:none;
+  background:linear-gradient(135deg,var(--accent),#00C98A);
+  color:#0A0F1E;font-weight:800;font-size:16px;font-family:'Sora',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  cursor:pointer;box-shadow:0 8px 32px rgba(0,229,160,0.28);transition:transform .15s;}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-sm{padding:10px 22px;border-radius:12px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font-family:'Sora',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:13px;cursor:pointer;width:auto;}
+.fi{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;border-radius:14px;margin-bottom:8px;cursor:pointer;
+  background:var(--card);border:1px solid var(--border);transition:all .15s;}
+.fi.on{background:var(--adim);border-color:var(--accent);}
+.fi:active{transform:scale(.98);}
+.tag{font-size:9px;padding:2px 7px;border-radius:99px;font-weight:700;
+  letter-spacing:.5px;display:inline-block;margin-left:4px;}
+.tg{background:rgba(255,184,48,.15);color:var(--warn);}
+.td{background:rgba(255,107,53,.15);color:var(--orange);}
+.tl{background:var(--adim);color:var(--accent);}
+.gbw{margin-bottom:14px;}
+.gbr{display:flex;justify-content:space-between;margin-bottom:6px;}
+.gbt{height:6px;border-radius:99px;background:var(--border);overflow:hidden;}
+.gbf{height:100%;border-radius:99px;transition:width 1.2s ease;}
+.logbar{position:fixed;bottom:calc(76px + var(--safe-b) + 8px);
+  left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:398px;
+  background:var(--surface);border:1px solid var(--accent);border-radius:16px;
+  padding:13px 16px;display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 8px 32px rgba(0,229,160,0.18);z-index:150;}
+.mfr{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 0;border-bottom:1px solid var(--border);}
+.mfi{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-family:'Sora',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;font-weight:700;
+  padding:8px 12px;outline:none;width:110px;text-align:right;}
+.mfi:focus{border-color:var(--accent);}
+.ms{flex:1;text-align:center;}
+.msb{padding:7px 4px;border-radius:8px;border:1px solid var(--border);background:var(--surface);}
+.msb.hit{background:var(--adim);border-color:var(--accent);}
+.msv{font-size:12px;font-weight:700;color:var(--muted);}
+.msb.hit .msv{color:var(--accent);}
+.msy{font-size:9px;color:var(--muted);margin-top:3px;}
+.loader{display:flex;justify-content:center;align-items:center;padding:60px 0;gap:8px;}
+@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--accent);animation:bounce 1.4s ease-in-out infinite;}
+.dot:nth-child(2){animation-delay:.16s;}.dot:nth-child(3){animation-delay:.32s;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.fu{animation:fadeUp .35s ease forwards;}
+@keyframes pop{0%{transform:scale(.5);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+.pop{animation:pop .45s ease forwards;}
+.setup{background:linear-gradient(135deg,#1A2240,var(--card));
+  border:1px solid var(--warn);border-radius:16px;padding:16px;
+  margin-bottom:16px;color:var(--warn);font-size:13px;line-height:1.7;}
+.setup code{background:var(--surface);border-radius:6px;padding:2px 7px;font-size:11px;color:var(--accent);}
+</style>
+<script>
+// Defined in <head> so nav buttons can always call go() safely
+function go(s){ if(typeof _go==="function") _go(s); else window._qNav=s; }
+</script>
+</head>
+<body>
+<div id="app">
+  <div class="screen" id="scr"></div>
+  <nav>
+    <button class="nb on" data-s="home" onclick="go('home')"><span class="ni">⊡</span><span class="nl">Home</span></button>
+    <button class="nb" data-s="log" onclick="go('log')"><span class="ni">✚</span><span class="nl">Log</span></button>
+    <button class="nb" data-s="trends" onclick="go('trends')"><span class="ni">↗</span><span class="nl">Trends</span></button>
+    <button class="nb" data-s="foods" onclick="go('foods')"><span class="ni">◎</span><span class="nl">Foods</span></button>
+    <button class="nb" data-s="metrics" onclick="go('metrics')"><span class="ni">♡</span><span class="nl">Metrics</span></button>
+  </nav>
+</div>
+<script>
+let API = localStorage.getItem('ht_api_url') || sessionStorage.getItem('ht_api_url') || '';
+// ---
+
+const FOOD_DB_LOCAL=[
+  {category:"Breakfast",name:"Idli",portion:"1 small",cal:60,protein:2,glycemic:"",remark:""},
+  {category:"Breakfast",name:"Dosa",portion:"1 medium",cal:150,protein:3,glycemic:"",remark:""},
+  {category:"Breakfast",name:"Masala Dosa",portion:"1",cal:450,protein:5,glycemic:"",remark:"Glycemic"},
+  {category:"Breakfast",name:"Upma",portion:"200g",cal:350,protein:5,glycemic:"",remark:"Glycemic"},
+  {category:"Lunch",name:"Chapathi",portion:"1 medium",cal:110,protein:3,glycemic:"Low",remark:""},
+  {category:"Lunch",name:"Dal khichdi",portion:"1 bowl",cal:220,protein:8,glycemic:"Low",remark:""},
+  {category:"Lunch",name:"Chicken biryani",portion:"1 small bowl",cal:300,protein:12,glycemic:"",remark:""},
+  {category:"Lunch",name:"Sambar",portion:"1 bowl",cal:80,protein:4,glycemic:"Low",remark:""},
+  {category:"Lunch",name:"Lacha paratha",portion:"1 medium",cal:250,protein:5,glycemic:"",remark:""},
+  {category:"Lunch",name:"Boiled Chana",portion:"100g",cal:180,protein:8,glycemic:"Low",remark:""},
+  {category:"Dinner",name:"Chicken salad",portion:"200g",cal:250,protein:30,glycemic:"Low",remark:""},
+  {category:"Dinner",name:"Tuna Fish Salad",portion:"250g",cal:350,protein:30,glycemic:"",remark:""},
+  {category:"Dinner",name:"Moong dal",portion:"1 bowl",cal:140,protein:8,glycemic:"Low",remark:""},
+  {category:"Dinner",name:"Tomato curry",portion:"1 bowl",cal:70,protein:2,glycemic:"Low",remark:""},
+  {category:"Dinner",name:"Ragi Roti",portion:"1 medium",cal:140,protein:3,glycemic:"Low",remark:""},
+  {category:"Dinner",name:"Soya Paneer with ghee",portion:"100g",cal:133,protein:15.5,glycemic:"Low",remark:""},
+  {category:"Dinner",name:"Baked Fish",portion:"100g",cal:200,protein:25,glycemic:"Low",remark:""},
+  {category:"Snack",name:"Boiled Egg White",portion:"1",cal:17,protein:3.5,glycemic:"",remark:""},
+  {category:"Snack",name:"Omlette",portion:"1 egg",cal:100,protein:6,glycemic:"",remark:""},
+  {category:"Snack",name:"Omelette (2 eggs)",portion:"1 serving",cal:190,protein:13,glycemic:"Low",remark:""},
+  {category:"Snack",name:"Chicken kebab",portion:"100g",cal:200,protein:25,glycemic:"Low",remark:""},
+  {category:"Snack",name:"Peanut",portion:"1 cup",cal:180,protein:7,glycemic:"",remark:"Dense Calorie"},
+  {category:"Snack",name:"Roasted chana",portion:"50g",cal:180,protein:10,glycemic:"Low",remark:""},
+  {category:"Snack",name:"Apple",portion:"1 small",cal:80,protein:0.5,glycemic:"Low",remark:""},
+  {category:"Snack",name:"Papaya",portion:"1 bowl",cal:60,protein:1,glycemic:"Low",remark:""},
+  {category:"Snack",name:"Buttermilk",portion:"1 glass",cal:50,protein:3,glycemic:"Low",remark:""},
+  {category:"Snack",name:"Lemon tea",portion:"1 cup",cal:5,protein:0,glycemic:"Low",remark:""},
+  {category:"Snack",name:"Tea wos",portion:"1 cup",cal:80,protein:0,glycemic:"",remark:""},
+  {category:"Snack",name:"Coffee wos",portion:"1 cup",cal:60,protein:0,glycemic:"",remark:""},
+  {category:"Snack",name:"Dates",portion:"50g",cal:140,protein:1,glycemic:"",remark:""},
+  {category:"Snack",name:"Curd",portion:"100g",cal:70,protein:3,glycemic:"",remark:""},
+  {category:"Snack",name:"Mosambi",portion:"100ml",cal:180,protein:0,glycemic:"",remark:"Glycemic"},
+  {category:"Snack",name:"Digestive Biscuit",portion:"1",cal:85,protein:3,glycemic:"",remark:"Glycemic"},
+  {category:"Snack",name:"Black Coffee",portion:"1 cup",cal:5,protein:0,glycemic:"Low",remark:""},
+];
+
+let S={
+  screen:"home",dash:null,foods:null,today:null,plan:null,
+  log:{meal:"Breakfast",items:[null,null,null,null],search:"",date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})()},
+  logDone:false,logResult:null,
+  foodFilter:"All",
+  metrics:{weight:"",hba1c:"",ldl:"",trig:""},
+  metricsDone:false,
+  lastSave:null,
+  wellness:{
+    date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})(),
+    doctor:'', cause:'', notes:'',
+    symptoms:[{part:'',side:'',type:''},{part:'',side:'',type:''},{part:'',side:'',type:''},{part:'',side:'',type:''},{part:'',side:'',type:''}],
+    medicines:[{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''}],
+    prescriptionLink:'', reportLink:'',
+    saving:false, done:false, error:'',
+    entries:null, showHistory:false,
+    driveToken:'', folderId:''
+  },
+  addFood:{show:false,name:"",category:"Snack",portion:"1 serving",cal:"",protein:"",glycemic:"",remark:"",saving:false,error:"",done:false},
+  charts:{},
+};
+
+const isSetup=()=>!API||API==='';
+const fmt=n=>Math.round(n).toLocaleString();
+const greet=()=>{const h=new Date().getHours();return h<12?"Good Morning":h<17?"Good Afternoon":"Good Evening";};
+const dayStr=()=>new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+const todayKey=()=>new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});
+const dayName=()=>new Date().toLocaleDateString("en-GB",{weekday:"long"});
+const getDay=(s)=>{try{const p=s.split('/');return new Date(+p[2],+p[1]-1,+p[0]).toLocaleDateString("en-GB",{weekday:"long"});}catch(e){return dayName();}};
+const ld=()=>`<div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+
+async function api(action,body){
+  // Re-read from storage in case it was set after init
+  if(!API) API=localStorage.getItem('ht_api_url')||sessionStorage.getItem('ht_api_url')||'';
+  if(isSetup()) return null;
+  const url=`${API}?action=${action}`;
+  const r=await fetch(url,body?{method:"POST",body:JSON.stringify(body)}:{method:"GET"});
+  return r.json();
+}
+
+function mockDash(){
+  return{
+    actuals:[
+      {date:"20/04/2026",kcalIn:1610,protein:42},{date:"21/04/2026",kcalIn:2065,protein:42},
+      {date:"22/04/2026",kcalIn:1960,protein:52},{date:"23/04/2026",kcalIn:920,protein:26.5},
+      {date:"24/04/2026",kcalIn:1658.5,protein:65.5},{date:"25/04/2026",kcalIn:1734.5,protein:79},
+      {date:"26/04/2026",kcalIn:1296.5,protein:73},{date:"27/04/2026",kcalIn:1538,protein:35.5},
+      {date:"28/04/2026",kcalIn:1590,protein:46},{date:"29/04/2026",kcalIn:1513,protein:61.5},
+      {date:"30/04/2026",kcalIn:1860,protein:76},{date:"01/05/2026",kcalIn:1438,protein:72},
+      {date:"02/05/2026",kcalIn:1293,protein:56},
+    ],
+    goals:[
+      {year:"Dec'26",weight:90,hba1c:6.5,ldl:150,trig:175},
+      {year:"Dec'27",weight:85,hba1c:6.0,ldl:125,trig:150},
+      {year:"Dec'28",weight:80,hba1c:5.5,ldl:100,trig:125},
+      {year:"Dec'29",weight:75,hba1c:5.0,ldl:80,trig:90},
+    ],
+    current:{weight:95.3,hba1c:7.0,ldl:186,trig:220}
+  };
+}
+
+async function loadDash(){
+  if(S.dash) return;
+  if(isSetup()){S.dash=mockDash();return;}
+  const d=await api("dashboard");
+  S.dash=(d&&!d.error)?d:mockDash();
+}
+async function loadFoods(){
+  if(S.foods) return;
+  if(isSetup()){S.foods={foods:FOOD_DB_LOCAL};return;}
+  const d=await api("foods");
+  S.foods=(d&&!d.error)?d:{foods:FOOD_DB_LOCAL};
+}
+
+async function loadPlan(){
+  // Always fetch fresh - plan changes frequently
+  if(isSetup()){S.plan={plan:[]};return;}
+  try{
+    const d=await api("plan");
+    S.plan=(d&&!d.error)?d:{plan:[]};
+  }catch(e){
+    if(!S.plan) S.plan={plan:[]};
+  }
+}
+async function loadToday(){
+  // Always fetch fresh
+  if(isSetup()){S.today={meals:[],dailyKcal:0,dailyProt:0};return;}
+  try{
+    const d=await api("today");
+    S.today=(d&&!d.error)?d:{meals:[],dailyKcal:0,dailyProt:0};
+  }catch(e){
+    if(!S.today) S.today={meals:[],dailyKcal:0,dailyProt:0};
+  }
+}
+
+function tagH(food){
+  let h="";
+  const r=(food.remark||"").toLowerCase();
+  if(r.includes("glycemic"))h+=`<span class="tag tg">⚡ Glycemic</span>`;
+  if(r.includes("dense"))h+=`<span class="tag td">🔥 Dense</span>`;
+  if((food.glycemic||"").toLowerCase()==="low")h+=`<span class="tag tl">✓ Low GI</span>`;
+  return h;
+}
+
+function ring(val,max,color,label,unit,sz=88){
+  const r=(sz-12)/2,c=2*Math.PI*r,f=Math.min(1,val/max)*c;
+  return`<div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+    <div style="position:relative;width:${sz}px;height:${sz}px">
+      <svg width="${sz}" height="${sz}" style="transform:rotate(-90deg)">
+        <circle cx="${sz/2}" cy="${sz/2}" r="${r}" fill="none" stroke="var(--border)" stroke-width="10"/>
+        <circle cx="${sz/2}" cy="${sz/2}" r="${r}" fill="none" stroke="${color}" stroke-width="10"
+          stroke-dasharray="${f} ${c}" stroke-linecap="round" style="transition:stroke-dasharray 1.2s ease"/>
+      </svg>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">
+        <div style="font-size:17px;font-weight:800;color:${color}">${fmt(val)}</div>
+        <div style="font-size:9px;color:var(--muted);letter-spacing:1px">${unit}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted)">${label}</div>
+  </div>`;
+}
+
+function goalBar(label,cur,goal,unit){
+  const good=cur<=goal;
+  const w=Math.min(100,(cur/(goal*1.4))*100);
+  const gr=good?"linear-gradient(90deg,var(--accent),#00FF99)":"linear-gradient(90deg,var(--warn),var(--orange))";
+  return`<div class="gbw">
+    <div class="gbr">
+      <span style="color:var(--muted);font-size:12px">${label}</span>
+      <span style="color:${good?'var(--accent)':'var(--warn)'};font-size:12px;font-weight:600">${cur} → ${goal} ${unit}</span>
+    </div>
+    <div class="gbt"><div class="gbf" style="width:${w}%;background:${gr}"></div></div>
+  </div>`;
+}
+
+function killCharts(){Object.values(S.charts).forEach(c=>{try{c.destroy()}catch(e){}});S.charts={};}
+
+async function _go(screen){
+  S.screen=screen;
+  document.querySelectorAll(".nb").forEach(b=>b.classList.toggle("on",b.dataset.s===screen));
+  killCharts();
+  const el=document.getElementById("scr");
+  el.innerHTML=ld(); el.scrollTop=0;
+  if(screen==="home"){S.today=null;await Promise.all([loadDash(),loadToday(),loadPlan()]);el.innerHTML=renderHome();}
+  else if(screen==="log"){S.plan=null;await Promise.all([loadFoods(),loadPlan()]);el.innerHTML=renderLog();}
+  else if(screen==="trends"){S.dash=null;await loadDash();el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();});}
+  else if(screen==="foods"){await loadFoods();el.innerHTML=renderFoods();}
+  else if(screen==="metrics"){el.innerHTML=renderMetrics();}
+  else if(screen==="wellness"){await loadWellness();el.innerHTML=renderWellness();}
+}
+
+// ── Screens ───────────────────────────────────────────────────
+function renderHome(){
+  const d=S.dash, t=S.today;
+  const cur=d?.current||{weight:95.3,hba1c:7,ldl:186,trig:220};
+  const g0=(d?.goals||[])[0]||{year:"Dec'26",weight:90,hba1c:6.5,ldl:150,trig:175};
+  const kcal=t?.dailyKcal||0, prot=t?.dailyProt||0;
+  const budget=Math.max(0,1600-kcal);
+  const actuals=(d?.actuals||[]).filter(a=>a.kcalIn>0);
+
+  // Tomorrow's plan from S.plan
+  const plan=S.plan?.plan||[];
+  const norm=s=>s.split('/').map(x=>x.padStart(2,'0')).join('/');
+  const tmrDate=(()=>{const n=new Date();n.setDate(n.getDate()+1);
+    return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})();
+  const tmrDay=(()=>{const n=new Date();n.setDate(n.getDate()+1);
+    return n.toLocaleDateString('en-GB',{weekday:'long'});})();
+  const tmrPlan=plan.find(p=>norm(p.date)===norm(tmrDate));
+  const tmrMeals=tmrPlan?.meals||[];
+  const tmrKcal=tmrMeals.reduce((s,m)=>s+m.mealCal,0);
+  const tmrProt=tmrMeals.reduce((s,m)=>s+m.mealProt,0);
+
+  return`<div class="pad">
+  ${isSetup()?`<div class="setup fu">&#9881;&#65039; <strong>Sample data</strong> &mdash; Drive not connected.
+    <span onclick="showSetupPopup()" style="color:var(--accent);text-decoration:underline;cursor:pointer">
+    Connect now</span></div>`:`
+  <div style="background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:12px;
+    padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--accent);
+    display:flex;justify-content:space-between;align-items:center" class="fu">
+    <span>&#10003; Connected to Drive</span>
+    <span onclick="resetApiUrl()" style="color:var(--muted);cursor:pointer;font-size:11px">Change URL</span>
+  </div>`}
+
+  <!-- Header -->
+  <div style="padding-bottom:20px" class="fu">
+    <div style="color:var(--muted);font-size:11px;letter-spacing:2px;text-transform:uppercase">${dayStr()}</div>
+    <div style="font-size:26px;font-weight:800;margin-top:4px">${greet()} &#128075;</div>
+  </div>
+
+  <!-- Today rings -->
+  <div class="card fu" style="background:linear-gradient(135deg,var(--card),#1A2240);
+    box-shadow:0 0 40px rgba(0,229,160,0.07);margin-bottom:14px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:16px">TODAY'S INTAKE</div>
+    <div style="display:flex;justify-content:space-around">
+      ${ring(kcal,1600,kcal>1800?'var(--orange)':'var(--accent)','kcal','CALORIES')}
+      ${ring(prot,80,'var(--blue)','protein','GRAMS')}
+      ${ring(budget,1600,'var(--purple)','budget','LEFT')}
+    </div>
+    ${t?.meals?.length?`
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+      ${t.meals.map(m=>`
+      <div style="display:flex;justify-content:space-between;padding:4px 0">
+        <span style="color:var(--muted);font-size:12px">${m.mealType}</span>
+        <span style="color:var(--text);font-size:12px">${fmt(m.mealCal)} kcal &middot; ${m.mealProt}g protein</span>
+      </div>`).join('')}
+    </div>`:'<div style="color:var(--muted);font-size:12px;text-align:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">No meals logged yet today</div>'}
+  </div>
+
+  <!-- Tomorrow plan -->
+  <div class="card fu" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:2px">TOMORROW'S PLAN</div>
+        <div style="color:var(--text);font-size:13px;margin-top:2px">${tmrDay}</div>
+      </div>
+      ${tmrKcal>0?`<div style="text-align:right">
+        <div style="color:var(--blue);font-weight:700;font-size:16px">${fmt(tmrKcal)}</div>
+        <div style="color:var(--muted);font-size:11px">kcal planned</div>
+      </div>`:''}
+    </div>
+    ${tmrMeals.filter(m=>m.items&&m.items.length>0).length>0?`
+    ${tmrMeals.filter(m=>m.items&&m.items.length>0).map(m=>`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;
+      padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1">
+        <div style="color:var(--text);font-size:12px;font-weight:600;margin-bottom:3px">${m.mealType}</div>
+        <div style="color:var(--muted);font-size:11px">
+          ${m.items.map(i=>i.food+(i.qty>1?' x'+i.qty:'')).join(' &middot; ')}
+        </div>
+      </div>
+      <div style="color:var(--blue);font-size:12px;font-weight:600;margin-left:10px;white-space:nowrap">
+        ${m.mealCal} kcal
+      </div>
+    </div>`).join('')}
+    ${tmrProt>0?`<div style="display:flex;justify-content:space-between;padding:8px 0 0">
+      <span style="color:var(--muted);font-size:12px">Total protein</span>
+      <span style="color:var(--blue);font-size:12px;font-weight:600">${tmrProt}g</span>
+    </div>`:''}
+    `:`
+    <div style="color:var(--muted);font-size:12px;text-align:center;padding:12px 0">
+      No plan yet for tomorrow &mdash;
+      <span onclick="_go('log')" style="color:var(--accent);cursor:pointer;text-decoration:underline">
+        Plan now</span>
+    </div>`}
+  </div>
+
+  <!-- Goals -->
+  <div class="card fu">
+    <div class="ct" style="margin-bottom:16px">Goals &mdash; ${g0.year}</div>
+    ${goalBar("Weight",cur.weight,g0.weight,"kg")}
+    ${goalBar("HbA1c",cur.hba1c,g0.hba1c,"%")}
+    ${goalBar("LDL",cur.ldl,g0.ldl,"mg/dL")}
+    ${goalBar("Triglycerides",cur.trig,g0.trig,"mg/dL")}
+  </div>
+  </div>`;
+}
+function renderLog(){
+  if(S.logDone) return renderLogDone();
+  const{meal,items,date}=S.log;
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  const past=isPast(date);
+  const isToday=date===todayKey();
+
+  // Get existing row for this date+meal from plan/records
+  const plan=S.plan?.plan||[];
+  const norm=s=>s.split('/').map(x=>x.padStart(2,'0')).join('/');
+  const planDay=plan.find(p=>norm(p.date)===norm(date));
+  const planMeal=planDay?.meals?.find(m=>m.mealType===meal);
+  const hasExisting=planMeal&&planMeal.items&&planMeal.items.length>0;
+
+  // All foods for dropdown - relevant category first, then all others
+  const mealFoods=[
+    ...foods.filter(f=>f.category===meal||f.category==='Anytime'),
+    ...foods.filter(f=>f.category!==meal&&f.category!=='Anytime')
+  ];
+
+  // Current slot state
+  const slots=[0,1,2,3].map(i=>({
+    selected: S.log.items[i]?.name||'',
+    qty: S.log.items[i]?.qty||1,
+    food: S.log.items[i]||null
+  }));
+
+  const validItems=(S.log.items||[]).filter(Boolean);
+  const totCal=validItems.reduce((s,i)=>s+i.cal*i.qty,0);
+  const totPro=validItems.reduce((s,i)=>s+i.protein*i.qty,0);
+
+  const blankOpt='<option value="">-- Select food --</option>';
+
+  // Status label
+  const statusLabel = past
+    ? '<span style="color:var(--warn);font-size:11px">&#128274; Record — edit to correct</span>'
+    : isToday
+      ? '<span style="color:var(--accent);font-size:11px">&#9679; Today — log what you eat</span>'
+      : '<span style="color:var(--blue);font-size:11px">&#9632; Plan — set what you intend to eat</span>';
+
+  return`<div class="pad" style="padding-bottom:20px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div style="font-size:22px;font-weight:800">Log Meal</div>
+    <button onclick="refreshLogData()"
+      style="padding:7px 14px;border-radius:99px;border:1px solid var(--border);
+        background:var(--card);color:var(--accent);font-size:12px;font-weight:700;
+        cursor:pointer;font-family:inherit" id="refresh-btn">
+      &#8635; Refresh
+    </button>
+  </div>
+
+  <!-- Success toast -->
+  ${S.lastSave&&(Date.now()-S.lastSave.ts<30000)?`
+  <div style="background:var(--adim);border:1px solid var(--accent);border-radius:16px;
+    padding:14px 16px;margin-bottom:16px;animation:fadeUp .3s ease">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div style="color:var(--accent);font-weight:700;font-size:14px;margin-bottom:4px">
+          &#10003; ${S.lastSave.mealType} saved!</div>
+        <div style="color:var(--text);font-size:13px">
+          ${fmt(S.lastSave.totalCal)} kcal &middot; ${S.lastSave.totalProtein}g protein</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:3px">
+          Day total: ${fmt(S.lastSave.dayKcal)} kcal &middot; ${S.lastSave.dayProt}g P
+          &nbsp;&middot;&nbsp; ${Math.max(0,1600-S.lastSave.dayKcal)} kcal remaining</div>
+      </div>
+      <button onclick="S.lastSave=null;reLog()"
+        style="background:none;border:none;color:var(--muted);font-size:16px;
+          cursor:pointer;padding:0;line-height:1">&#10005;</button>
+    </div>
+  </div>`:''}
+
+  <!-- Date picker -->
+  <div style="margin-bottom:14px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:6px">DATE</div>
+    <input type="date" value="${dateToISO(date)}" onchange="onDateChange(this.value)"
+      style="width:100%;padding:12px 16px;border-radius:14px;border:1px solid var(--border);
+        background:var(--card);color:var(--text);font-family:inherit;font-size:15px;
+        font-weight:600;outline:none"/>
+    <div style="margin-top:6px;padding-left:4px">${statusLabel}</div>
+  </div>
+
+  <!-- Meal tabs -->
+  <div style="margin-bottom:16px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:8px">MEAL</div>
+    <div class="prow">
+      ${["Breakfast","Lunch","Dinner","Snack"].map(m=>`
+      <button class="pill${meal===m?' on':''}" onclick="setMeal('${m}')">
+        ${m}${S.logStatus&&S.logStatus[date+'_'+m]?' ✓':''}
+      </button>`).join('')}
+    </div>
+  </div>
+
+  <!-- Existing record info -->
+  ${hasExisting?`
+  <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);
+    border-radius:14px;padding:12px 14px;margin-bottom:14px;display:flex;
+    justify-content:space-between;align-items:center">
+    <div>
+      <div style="color:var(--accent);font-size:10px;font-weight:700;letter-spacing:1px;margin-bottom:3px">
+        ${past?'RECORDED':'PLANNED'} ${meal.toUpperCase()}</div>
+      <div style="color:var(--text);font-size:12px">
+        ${planMeal.items.map(i=>i.food+(i.qty>1?' x'+i.qty:'')).join(' &middot; ')}</div>
+      <div style="color:var(--accent);font-size:11px;margin-top:2px">
+        ${planMeal.mealCal} kcal &middot; ${planMeal.mealProt}g protein</div>
+    </div>
+    <button onclick="loadExistingIntoSlots()"
+      style="padding:7px 12px;border-radius:10px;border:1px solid var(--accent);
+        background:var(--adim);color:var(--accent);font-size:12px;font-weight:700;
+        cursor:pointer;font-family:inherit;white-space:nowrap;margin-left:10px">
+      Load &#8594;
+    </button>
+  </div>`:`
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:10px 14px;margin-bottom:14px;color:var(--muted);font-size:12px">
+    No ${past?'record':'plan'} for ${meal} on ${date.slice(0,5)}
+  </div>`}
+
+  <!-- 4 Food slots -->
+  <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px">
+    ${past?'EDIT RECORD (UP TO 4 ITEMS)':'SET ITEMS (UP TO 4)'}
+  </div>
+  ${[0,1,2,3].map(i=>{
+    const sl=slots[i];
+    return`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px">
+      <div style="flex:1">
+        <select onchange="setSlotFood(${i},this.value)"
+          style="width:100%;padding:11px 12px;border-radius:12px;
+            border:1px solid ${sl.selected?'var(--accent)':'var(--border)'};
+            background:var(--card);color:${sl.selected?'var(--text)':'var(--muted)'};
+            font-family:inherit;font-size:13px;outline:none">
+          ${blankOpt}
+          ${mealFoods.map(f=>`<option value="${f.name.trim()}"
+            ${sl.selected.trim()===f.name.trim()?'selected':''}
+            >${f.name.trim()} (${f.cal} kcal)</option>`).join('')}
+        </select>
+        ${sl.food?`<div style="color:var(--muted);font-size:10px;margin-top:3px;padding-left:4px">
+          ${sl.food.cal} kcal &middot; ${sl.food.protein}g protein &middot; ${sl.food.portion||''}
+        </div>`:''}
+      </div>
+      ${sl.selected?`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px">
+        <div style="color:var(--muted);font-size:9px;letter-spacing:1px">QTY</div>
+        <input type="number" min="0.5" step="0.5" value="${sl.qty}"
+          onchange="setSlotQty(${i},this.value)"
+          style="width:58px;padding:8px 6px;border-radius:10px;border:1px solid var(--accent);
+            background:var(--surface);color:var(--accent);font-size:14px;
+            font-weight:700;text-align:center;font-family:inherit;outline:none"/>
+        <button onclick="clearSlot(${i})"
+          style="width:58px;padding:3px 0;border-radius:8px;border:1px solid var(--border);
+            background:var(--surface);color:var(--muted);font-size:11px;
+            cursor:pointer;font-family:inherit">&#10005; clr</button>
+      </div>`:''}
+    </div>`;
+  }).join('')}
+
+  <!-- Summary -->
+  ${validItems.length?`
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:14px;margin-top:4px;margin-bottom:90px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:1.5px;margin-bottom:8px">SUMMARY</div>
+    ${validItems.map(i=>`
+    <div style="display:flex;justify-content:space-between;padding:4px 0;
+      border-bottom:1px solid var(--border)">
+      <span style="color:var(--text);font-size:13px">${i.name} x${i.qty}</span>
+      <span style="color:var(--accent);font-size:13px;font-weight:600">
+        ${Math.round(i.cal*i.qty)} kcal</span>
+    </div>`).join('')}
+    <div style="display:flex;justify-content:space-between;padding:8px 0 0">
+      <span style="color:var(--text);font-weight:700">Total</span>
+      <span style="color:var(--accent);font-weight:800;font-size:16px">
+        ${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g P</span>
+    </div>
+  </div>`:''}
+  </div>
+
+  <!-- Save bar -->
+  ${validItems.length?`<div class="logbar">
+    <div>
+      <div style="color:var(--accent);font-weight:800;font-size:18px">
+        ${fmt(totCal)} kcal &middot; ${Math.round(totPro)}g</div>
+      <div style="color:var(--muted);font-size:11px">
+        ${meal} &mdash; ${date.slice(0,5)} &mdash; ${past?'Update record':'Save'}</div>
+    </div>
+    <button onclick="submitLog()"
+      style="background:var(--accent);border:none;border-radius:12px;
+        padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;
+        cursor:pointer;font-family:inherit">
+      ${past?'Update &#8594;':'Save &#8594;'}</button>
+  </div>`:''}`;
+}
+function renderLogDone(){
+  const r=S.logResult;
+  return`<div style="padding:calc(60px + var(--safe-t)) 16px;display:flex;flex-direction:column;align-items:center;gap:20px">
+    <div class="pop" style="font-size:72px">✅</div>
+    <div style="color:var(--accent);font-weight:800;font-size:24px;text-align:center">${r.mealType} Logged!</div>
+    <div style="display:flex;gap:12px">
+      <div style="text-align:center;background:var(--adim);border-radius:14px;padding:14px 22px">
+        <div style="color:var(--accent);font-weight:800;font-size:24px">${fmt(r.totalCal)}</div>
+        <div style="color:var(--muted);font-size:11px">kcal</div>
+      </div>
+      <div style="text-align:center;background:rgba(74,159,255,.12);border-radius:14px;padding:14px 22px">
+        <div style="color:var(--blue);font-weight:800;font-size:24px">${Math.round(r.totalProtein)}g</div>
+        <div style="color:var(--muted);font-size:11px">protein</div>
+      </div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;font-size:13px;line-height:1.7;width:100%">
+      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:6px">DAY TOTAL</div>
+      🔥 <strong style="color:var(--accent)">${fmt(r.dayKcal)}</strong> kcal
+      &nbsp;·&nbsp; 💪 <strong style="color:var(--blue)">${r.dayProt}g</strong> protein<br>
+      ${r.dayKcal>1600
+        ?`<span style="color:var(--warn);font-size:12px">⚠️ Over target by ${fmt(r.dayKcal-1600)} kcal</span>`
+        :`<span style="color:var(--accent);font-size:12px">✓ ${fmt(1600-r.dayKcal)} kcal remaining</span>`}
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-sm" onclick="resetLog()">Log Another</button>
+      <button class="btn-sm" onclick="go('home')">← Home</button>
+    </div>
+  </div>`;
+}
+
+function renderTrends(){
+  const d=S.dash;
+  const cur=d?.current||{weight:95.3,hba1c:7,ldl:186,trig:220};
+  const goals=d?.goals||[];
+  const ms=[
+    {label:"Weight (kg)",current:cur.weight,goals:goals.map(g=>g.weight),years:goals.map(g=>g.year)},
+    {label:"HbA1c (%)",current:cur.hba1c,goals:goals.map(g=>g.hba1c),years:goals.map(g=>g.year)},
+    {label:"LDL",current:cur.ldl,goals:goals.map(g=>g.ldl),years:goals.map(g=>g.year)},
+    {label:"Triglycerides",current:cur.trig,goals:goals.map(g=>g.trig),years:goals.map(g=>g.year)},
+  ];
+  return`<div class="pad">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div style="font-size:22px;font-weight:800">Trends</div>
+    <button onclick="S.dash=null;go('trends')" style="padding:7px 14px;border-radius:99px;
+      border:1px solid var(--border);background:var(--card);color:var(--accent);
+      font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+      &#8635; Refresh
+    </button>
+  </div>
+  <div class="card"><div class="ct">Calorie Intake</div><div class="cs">Target: 1,400–1,600 kcal/day</div>
+    <div style="height:170px"><canvas id="calChart"></canvas></div></div>
+  <div class="card"><div class="ct">Protein Intake</div><div class="cs">Target: 60–80g/day</div>
+    <div style="height:150px"><canvas id="protChart"></canvas></div></div>
+  <div class="card"><div class="ct">Daily Comparison</div><div class="cs">Calories vs Protein</div>
+    <div style="height:150px"><canvas id="barChart"></canvas></div></div>
+  <div class="card">
+    <div class="ct" style="margin-bottom:16px">Long-term Milestones</div>
+    ${ms.map(m=>`<div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="color:var(--text);font-size:13px">${m.label}</span>
+        <span style="color:var(--warn);font-size:13px;font-weight:700">Now: ${m.current}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        ${(m.goals||[]).map((g,i)=>`<div class="ms">
+          <div class="msb${m.current<=g?' hit':''}"><div class="msv">${g}</div></div>
+          <div class="msy">${(m.years||[])[i]||""}</div>
+        </div>`).join("")}
+      </div>
+    </div>`).join("")}
+  </div></div>`;
+}
+
+function renderFoods(){
+  const cats=["All","Breakfast","Lunch","Dinner","Snack"];
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  const shown=S.foodFilter==="All"?foods:foods.filter(f=>f.category===S.foodFilter);
+  const af=S.addFood;
+
+  const addFormHTML = af.show ? `
+  <div style="background:var(--card);border:1px solid var(--accent);border-radius:18px;
+    padding:18px;margin-bottom:16px">
+    <div style="color:var(--accent);font-size:12px;font-weight:700;letter-spacing:1px;margin-bottom:14px">
+      NEW FOOD ITEM</div>
+
+    ${af.error?`<div style="background:rgba(255,71,87,0.12);border:1px solid rgba(255,71,87,0.3);
+      border-radius:10px;padding:10px 12px;color:#FF4757;font-size:12px;margin-bottom:12px">${af.error}</div>`:''}
+    ${af.done?`<div style="background:var(--adim);border:1px solid var(--accent);
+      border-radius:10px;padding:10px 12px;color:var(--accent);font-size:12px;margin-bottom:12px">
+      Added successfully to kCal-DB</div>`:''}
+
+    <div style="margin-bottom:10px">
+      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">FOOD NAME *</div>
+      <input type="text" placeholder="e.g. Paneer Tikka"
+        value="${af.name}" oninput="S.addFood.name=this.value"
+        style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+          background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;outline:none"/>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">CATEGORY</div>
+        <select oninput="S.addFood.category=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none">
+          ${["Breakfast","Lunch","Dinner","Snack","Anytime"].map(c=>
+            `<option value="${c}" ${af.category===c?"selected":""}>${c}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">PORTION</div>
+        <input type="text" placeholder="e.g. 100g"
+          value="${af.portion}" oninput="S.addFood.portion=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none"/>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">CALORIES *</div>
+        <input type="number" placeholder="0"
+          value="${af.cal}" oninput="S.addFood.cal=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;
+            font-weight:700;outline:none;text-align:left"/>
+      </div>
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">PROTEIN (g) *</div>
+        <input type="number" placeholder="0" step="0.5"
+          value="${af.protein}" oninput="S.addFood.protein=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;
+            font-weight:700;outline:none;text-align:left"/>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">GLYCEMIC</div>
+        <select oninput="S.addFood.glycemic=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none">
+          <option value="" ${af.glycemic===""?"selected":""}>Unknown</option>
+          <option value="Low" ${af.glycemic==="Low"?"selected":""}>Low GI</option>
+          <option value="High" ${af.glycemic==="High"?"selected":""}>High GI</option>
+        </select>
+      </div>
+      <div>
+        <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:5px">REMARK</div>
+        <select oninput="S.addFood.remark=this.value"
+          style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+            background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none">
+          <option value="" ${af.remark===""?"selected":""}>None</option>
+          <option value="Dense Calorie" ${af.remark==="Dense Calorie"?"selected":""}>Dense Calorie</option>
+          <option value="Glycemic" ${af.remark==="Glycemic"?"selected":""}>Glycemic</option>
+          <option value="Fat" ${af.remark==="Fat"?"selected":""}>Fat</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button onclick="submitAddFood()" ${af.saving?"disabled":""}
+        style="flex:1;padding:13px;border-radius:12px;border:none;
+          background:linear-gradient(135deg,var(--accent),#00C98A);
+          color:#0A0F1E;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit">
+        ${af.saving?"Saving...":"Save to Drive"}
+      </button>
+      <button onclick="S.addFood.show=false;S.addFood.done=false;S.addFood.error='';reFoods()"
+        style="padding:13px 18px;border-radius:12px;border:1px solid var(--border);
+          background:var(--surface);color:var(--muted);font-size:14px;cursor:pointer;font-family:inherit">
+        Cancel
+      </button>
+    </div>
+  </div>` : "";
+
+  return`<div class="pad">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <div style="font-size:22px;font-weight:800">Food Database</div>
+    <button onclick="toggleAddFood()"
+      style="padding:8px 16px;border-radius:99px;border:none;cursor:pointer;font-family:inherit;
+        font-size:13px;font-weight:700;
+        background:${af.show?'var(--card)':'var(--accent)'};
+        color:${af.show?'var(--muted)':'#0A0F1E'}">
+      ${af.show?"Cancel":"+ Add Food"}
+    </button>
+  </div>
+  <div style="color:var(--muted);font-size:12px;margin-bottom:16px">${foods.length} items &mdash; synced from Drive</div>
+
+  ${addFormHTML}
+
+  <div class="prow">
+    ${cats.map(c=>`<button class="pill${S.foodFilter===c?" on":""}" onclick="setFF('${c}')">${c}</button>`).join("")}
+  </div>
+
+  ${shown.map(f=>`<div class="fi" style="cursor:default">
+    <div style="flex:1">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+        <span style="font-size:14px">${f.name}</span>${tagH(f)}
+      </div>
+      <span style="color:var(--muted);font-size:11px">${f.portion||f.category}</span>
+    </div>
+    <div style="text-align:right;min-width:54px">
+      <div style="color:var(--accent);font-weight:700;font-size:15px">${f.cal}</div>
+      <div style="color:var(--blue);font-size:11px">${f.protein}g P</div>
+    </div>
+  </div>`).join("")}
+  </div>`;
+}
+function renderMetrics(){
+  if(S.metricsDone) return`<div style="padding:calc(80px + var(--safe-t)) 16px;display:flex;flex-direction:column;align-items:center;gap:20px">
+    <div class="pop" style="font-size:64px">📊</div>
+    <div style="color:var(--accent);font-weight:800;font-size:22px">Metrics Saved!</div>
+    <div style="color:var(--muted);font-size:14px;text-align:center">Updated in your Drive dashboard</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-sm" onclick="resetMetrics()">Log Again</button>
+      <button class="btn-sm" onclick="go('home')">← Home</button>
+    </div>
+  </div>`;
+  return`<div class="pad">
+  <div style="font-size:22px;font-weight:800;margin-bottom:6px">Health Metrics</div>
+  <div style="color:var(--muted);font-size:12px;margin-bottom:24px">Leave blank to skip · Writes to Drive Dashboard sheet</div>
+  <div class="card">
+    ${[
+      {key:"weight",label:"Weight",sub:"Goal: 90 kg by Dec '26",ph:"95.3",unit:"kg",step:"0.1"},
+      {key:"hba1c",label:"HbA1c",sub:"Goal: 6.5% by Dec '26",ph:"7.0",unit:"%",step:"0.1"},
+      {key:"ldl",label:"LDL",sub:"Goal: 150 mg/dL by Dec '26",ph:"186",unit:"mg/dL",step:"1"},
+      {key:"trig",label:"Triglycerides",sub:"Goal: 175 mg/dL by Dec '26",ph:"220",unit:"mg/dL",step:"1"},
+    ].map((f,i)=>`<div class="mfr" style="${i===3?'border-bottom:none':''}">
+      <div>
+        <div style="color:var(--text);font-size:14px;font-weight:600">${f.label}</div>
+        <div style="color:var(--muted);font-size:11px">${f.sub}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input class="mfi" type="number" step="${f.step}" placeholder="${f.ph}"
+          value="${S.metrics[f.key]}" oninput="S.metrics['${f.key}']=this.value"/>
+        <span style="color:var(--muted);font-size:12px">${f.unit}</span>
+      </div>
+    </div>`).join("")}
+  </div>
+  <button class="btn" onclick="submitMetrics()">Save to Drive →</button>
+  </div>`;
+}
+
+// ── Actions ───────────────────────────────────────────────────
+
+function selectMeal(m){ S.log.meal=m; reLog(); }
+
+function addPlannedItem(name){
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  const food=foods.find(f=>f.name.toLowerCase()===name.toLowerCase())
+    || {name,cal:0,protein:0,category:"Snack",portion:"1 serving"};
+  const idx=S.log.items.findIndex(i=>i.name===name);
+  if(idx>=0) S.log.items.splice(idx,1);
+  else S.log.items.push({...food,qty:1});
+  reLog();
+}
+
+// Convert DD/MM/YYYY to YYYY-MM-DD for date input
+function isPast(ddmmyyyy){
+  const p=ddmmyyyy.split('/');
+  if(p.length!==3) return false;
+  const d=new Date(+p[2],+p[1]-1,+p[0]);
+  const t=new Date(); t.setHours(0,0,0,0);
+  return d<t;
+}
+function dateToISO(ddmmyyyy){
+  const p=ddmmyyyy.split('/');
+  if(p.length===3){
+    return p[2]+'-'+String(p[1]).padStart(2,'0')+'-'+String(p[0]).padStart(2,'0');
+  }
+  return new Date().toISOString().slice(0,10);
+}
+
+// Convert YYYY-MM-DD to DD/MM/YYYY
+function isoToDate(iso){
+  const p=iso.split('-');
+  if(p.length===3){
+    return String(p[2]).padStart(2,'0')+'/'+String(p[1]).padStart(2,'0')+'/'+p[0];
+  }
+  return S.log.date;
+}
+
+function onDateChange(isoVal){
+  S.log.date=isoToDate(isoVal);
+  S.log.items=[null,null,null,null];
+  reLog();
+}
+
+function isPastDate(ddmmyyyy){
+  const p=ddmmyyyy.split('/');
+  if(p.length!==3) return false;
+  const d=new Date(+p[2],+p[1]-1,+p[0]);
+  const t=new Date(); t.setHours(0,0,0,0);
+  return d < t;
+}
+
+function setSlotFood(idx, name){
+  if(!name) return;
+  // Debounce: ignore if same value already set
+  const current = S.log.items&&S.log.items[idx]?S.log.items[idx].name:'';
+  if(name.trim()===current.trim()) return; // never clear a slot via onchange - user must use a clear button
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  if(!S.log.items||S.log.items.length<4) S.log.items=[null,null,null,null];
+  const n=name.trim().toLowerCase();
+  const food=foods.find(f=>f.name.trim().toLowerCase()===n);
+  const prevQty=S.log.items[idx]?.qty||1;
+  if(food){
+    S.log.items[idx]={...food, qty:prevQty};
+  } else {
+    S.log.items[idx]={name:name.trim(), cal:0, protein:0, category:'', portion:'', qty:prevQty};
+  }
+  reLog();
+}
+
+function clearSlot(idx){
+  if(!S.log.items) return;
+  S.log.items[idx]=null;
+  reLog();
+}
+function setSlotQty(idx, val){
+  if(S.log.items[idx]) S.log.items[idx].qty=parseFloat(val)||1;
+}
+
+function loadPlanIntoSlots(){
+  const{meal,date}=S.log;
+  const plan=S.plan?.plan||[];
+  const norm=s=>s.split('/').map(x=>x.padStart(2,'0')).join('/');
+  const planDay=plan.find(p=>norm(p.date)===norm(date));
+  const planMeal=planDay?.meals?.find(m=>m.mealType===meal);
+  if(!planMeal||!planMeal.items.length) return;
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  // Reset all slots first
+  S.log.items=[null,null,null,null];
+  // Fill from plan items (unique items only)
+  const seen=new Set();
+  let slotIdx=0;
+  planMeal.items.forEach(pi=>{
+    if(slotIdx>=4) return;
+    const key=pi.food.trim().toLowerCase();
+    if(seen.has(key)) return; // skip duplicates
+    seen.add(key);
+    const food=foods.find(f=>f.name.trim().toLowerCase()===key)
+      ||{name:pi.food.trim(), cal:0, protein:0, category:meal, portion:'1 serving'};
+    S.log.items[slotIdx]={...food, qty:pi.qty||1};
+    slotIdx++;
+  });
+  reLog();
+}
+
+// ── Action functions ─────────────────────────────────────────
+
+
+async function refreshLogData(){
+  const btn = document.getElementById('refresh-btn');
+  if(btn){ btn.textContent='Refreshing...'; btn.disabled=true; }
+  // Force reload plan and today data
+  S.plan=null;
+  S.today=null;
+  S.foods=null; // also reload food DB in case new items added
+  await Promise.all([loadPlan(), loadFoods(), loadToday()]);
+  reLog();
+}
+
+function setMeal(m){
+  S.log.meal=m;
+  S.log.items=[null,null,null,null];
+  reLog();
+}
+
+function reLog(){
+  const el=document.getElementById('scr');
+  if(el){
+    el.innerHTML=renderLog();
+    // Force-set select values after render (fixes Android display bug)
+    requestAnimationFrame(()=>{
+      (S.log.items||[]).forEach((item,i)=>{
+        if(!item) return;
+        const sel=el.querySelector('select:nth-of-type('+(i+1)+')');
+        if(sel && item.name) sel.value=item.name.trim();
+      });
+    });
+  }
+}
+
+function reFoods(){
+  const el=document.getElementById('scr');
+  if(el) el.innerHTML=renderFoods();
+}
+
+function setFF(f){
+  S.foodFilter=f;
+  reFoods();
+}
+
+function onDateChange(isoVal){
+  S.log.date=isoToDate(isoVal);
+  S.log.items=[null,null,null,null];
+  S.log.meal='Breakfast';
+  reLog();
+}
+
+function setSlotFood(idx, name){
+  if(!name) return;
+  if(!S.log.items||S.log.items.length<4) S.log.items=[null,null,null,null];
+  const current=S.log.items[idx]?S.log.items[idx].name:'';
+  if(name.trim()===current.trim()) return; // debounce
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  const n=name.trim().toLowerCase();
+  const food=foods.find(f=>f.name.trim().toLowerCase()===n);
+  const prevQty=S.log.items[idx]?.qty||1;
+  S.log.items[idx]=food
+    ? {...food, qty:prevQty}
+    : {name:name.trim(), cal:0, protein:0, category:'', portion:'', qty:prevQty};
+  reLog();
+}
+
+function setSlotQty(idx, val){
+  if(S.log.items&&S.log.items[idx]){
+    S.log.items[idx].qty=parseFloat(val)||1;
+    reLog();
+  }
+}
+
+function clearSlot(idx){
+  if(S.log.items) S.log.items[idx]=null;
+  reLog();
+}
+
+function loadExistingIntoSlots(){
+  const{meal,date}=S.log;
+  const plan=S.plan?.plan||[];
+  const norm=s=>s.split('/').map(x=>x.padStart(2,'0')).join('/');
+  const planDay=plan.find(p=>norm(p.date)===norm(date));
+  const planMeal=planDay?.meals?.find(m=>m.mealType===meal);
+  if(!planMeal||!planMeal.items.length) return;
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  S.log.items=[null,null,null,null];
+  const seen=new Set();
+  let si=0;
+  planMeal.items.forEach(pi=>{
+    if(si>=4) return;
+    const key=pi.food.trim().toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    const food=foods.find(f=>f.name.trim().toLowerCase()===key)
+      ||{name:pi.food.trim(),cal:0,protein:0,category:meal,portion:'1 serving'};
+    S.log.items[si]={...food,qty:pi.qty||1};
+    si++;
+  });
+  reLog();
+}
+
+// Legacy alias
+function loadPlanIntoSlots(){ loadExistingIntoSlots(); }
+
+function resetLog(){
+  const d=S.log.date;
+  const m=S.log.meal;
+  S.log={meal:m,items:[null,null,null,null],date:d};
+  S.logDone=false;
+  S.logResult=null;
+  reLog();
+}
+
+function resetMetrics(){
+  S.metricsDone=false;
+  S.metrics={weight:'',hba1c:'',ldl:'',trig:''};
+  _go('metrics');
+}
+
+async function submitLog(){
+  const{meal,items,date}=S.log;
+  const validItems=(items||[]).filter(Boolean);
+  if(!validItems.length) return;
+  const totalCal=Math.round(validItems.reduce((s,i)=>s+i.cal*i.qty,0));
+  const totalProtein=Math.round(validItems.reduce((s,i)=>s+i.protein*i.qty,0));
+
+  // Show saving indicator inline
+  const el=document.getElementById('scr');
+  el.innerHTML=`<div style="padding:calc(100px + var(--safe-t)) 16px;text-align:center">
+    ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">
+    ${isPast(date)?'Updating record...':'Saving to Drive...'}</div>
+    <div style="color:var(--muted);font-size:13px;margin-top:6px">Writing to Sheets</div></div>`;
+
+  let result;
+  if(isSetup()){
+    result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};
+  } else {
+    try{
+      result=await api('logMeal',{
+        date:S.log.date,
+        dayName:getDay(S.log.date),
+        mealType:meal,
+        items:validItems.map(i=>({food:i.name,qty:i.qty,cal:i.cal,protein:i.protein})),
+        totalCal,
+        totalProtein,
+        overwrite:true
+      });
+    }catch(e){
+      result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein,error:e.message};
+    }
+  }
+
+  // Store last save result for toast
+  S.lastSave={
+    mealType:meal,
+    totalCal,
+    totalProtein,
+    dayKcal:result.dayKcal||totalCal,
+    dayProt:result.dayProt||totalProtein,
+    error:result.error||null,
+    ts:Date.now()
+  };
+
+  // Clear slots for next meal, keep date and advance to next meal
+  S.log.items=[null,null,null,null];
+  const meals=["Breakfast","Lunch","Dinner","Snack"];
+  const nextMeal=meals[(meals.indexOf(meal)+1)%meals.length];
+  S.log.meal=nextMeal;
+
+  // Force reload plan and today from Sheets
+  S.today=null;
+  S.plan=null;
+  await Promise.all([loadPlan(),loadToday()]);
+
+  // Re-render log page (stays on same page)
+  reLog();
+}
+
+async function submitMetrics(){
+  const{weight,hba1c,ldl,trig}=S.metrics;
+  if(!weight&&!hba1c&&!ldl&&!trig) return;
+  const el=document.getElementById('scr');
+  el.innerHTML=`<div style="padding:calc(100px + var(--safe-t)) 16px;text-align:center">
+    ${ld()}<div style="color:var(--accent);font-size:16px;font-weight:700;margin-top:16px">
+    Updating Drive...</div></div>`;
+  if(!isSetup()){
+    try{
+      await api('logMetrics',{
+        date:todayKey(),
+        weight:weight?parseFloat(weight):null,
+        hba1c:hba1c?parseFloat(hba1c):null,
+        ldl:ldl?parseFloat(ldl):null,
+        trig:trig?parseFloat(trig):null
+      });
+    }catch(e){}
+  }
+  S.metricsDone=true;
+  S.dash=null;
+  el.innerHTML=renderMetrics();
+}
+
+function toggleAddFood(){
+  S.addFood.show=!S.addFood.show;
+  S.addFood.done=false;
+  S.addFood.error='';
+  reFoods();
+}
+
+async function submitAddFood(){
+  const af=S.addFood;
+  if(!af.name.trim()){af.error='Food name is required';reFoods();return;}
+  if(!af.cal){af.error='Calories are required';reFoods();return;}
+  S.addFood.saving=true; S.addFood.error=''; reFoods();
+  const body={
+    category:af.category, name:af.name.trim(),
+    portion:af.portion||'1 serving',
+    cal:parseFloat(af.cal)||0, protein:parseFloat(af.protein)||0,
+    glycemic:af.glycemic||'', remark:af.remark||''
+  };
+  if(isSetup()){
+    if(!S.foods) S.foods={foods:[...FOOD_DB_LOCAL]};
+    S.foods.foods.push(body);
+    S.addFood={show:true,name:'',category:'Snack',portion:'1 serving',
+      cal:'',protein:'',glycemic:'',remark:'',saving:false,error:'',done:true};
+    reFoods(); return;
+  }
+  try{
+    const result=await api('addFood',body);
+    if(result&&result.success){
+      if(!S.foods) S.foods={foods:[...FOOD_DB_LOCAL]};
+      S.foods.foods.push(result.food);
+      S.addFood={show:true,name:'',category:'Snack',portion:'1 serving',
+        cal:'',protein:'',glycemic:'',remark:'',saving:false,error:'',done:true};
+    } else {
+      S.addFood.saving=false;
+      S.addFood.error=result?.error||'Failed to save. Try again.';
+    }
+  }catch(e){
+    S.addFood.saving=false;
+    S.addFood.error='Network error: '+e.message;
+  }
+  reFoods();
+}
+
+
+// ── Wellness constants ────────────────────────────────────────
+const BODY_PARTS = ['Head','Chest','Hand','Wrist','Leg','Thigh','Back','Backside',
+  'Shoulder','Eye','Tooth','Finger','Nail','Toe','Foot','Stomach'];
+const SIDES = ['Left','Right','Centre','Back of','Front of','Top','Top Left',
+  'Top Right','Bottom','Bottom Right','Bottom Left','Middle Right','Middle Left'];
+const SYMPTOMS = ['Fever','Vomit','Dysentery','Pain','Ache','Spasm','Sprain',
+  'Feel Lost','Sneeze','Injured','Fractured','Tear','Cut','Vision Loss','Vision Not Clear'];
+const DRIVE_CLIENT_ID = ''; // Set your Google OAuth Client ID here
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+// ── Load wellness entries ─────────────────────────────────────
+async function loadWellness(){
+  if(S.wellness.entries) return;
+  if(isSetup()){S.wellness.entries=[];return;}
+  try{
+    const d=await api('wellness');
+    S.wellness.entries=(d&&!d.error)?d.entries:[];
+  }catch(e){ S.wellness.entries=[]; }
+}
+
+// ── Google OAuth for Drive upload ─────────────────────────────
+function initGoogleAuth(){
+  return new Promise((resolve)=>{
+    if(S.wellness.driveToken){resolve(S.wellness.driveToken);return;}
+    // Check localStorage
+    const stored=localStorage.getItem('ht_drive_token');
+    const expiry=localStorage.getItem('ht_drive_token_expiry');
+    if(stored && expiry && Date.now()<parseInt(expiry)){
+      S.wellness.driveToken=stored; resolve(stored); return;
+    }
+    // Need OAuth - open popup
+    if(!DRIVE_CLIENT_ID){
+      alert('Google OAuth Client ID not configured. Please add it to index.html');
+      resolve(null); return;
+    }
+    const w=600,h=600;
+    const left=(screen.width-w)/2, top=(screen.height-h)/2;
+    const authUrl='https://accounts.google.com/o/oauth2/auth?'+
+      'client_id='+encodeURIComponent(DRIVE_CLIENT_ID)+
+      '&redirect_uri='+encodeURIComponent('urn:ietf:wg:oauth:2.0:oob')+
+      '&response_type=token'+
+      '&scope='+encodeURIComponent(DRIVE_SCOPE);
+    const popup=window.open(authUrl,'driveAuth',
+      'width='+w+',height='+h+',left='+left+',top='+top);
+    // Poll for token in URL
+    const poll=setInterval(()=>{
+      try{
+        const url=popup.location.href;
+        if(url.includes('access_token=')){
+          clearInterval(poll); popup.close();
+          const token=url.match(/access_token=([^&]+)/)[1];
+          const expiresIn=parseInt(url.match(/expires_in=([^&]+)/)?.[1]||'3600');
+          S.wellness.driveToken=token;
+          localStorage.setItem('ht_drive_token',token);
+          localStorage.setItem('ht_drive_token_expiry',String(Date.now()+expiresIn*1000));
+          resolve(token);
+        }
+      }catch(e){}
+      if(popup.closed){ clearInterval(poll); resolve(null); }
+    },500);
+  });
+}
+
+async function ensureDriveFolder(){
+  if(S.wellness.folderId) return S.wellness.folderId;
+  const stored=localStorage.getItem('ht_wellness_folder');
+  if(stored){S.wellness.folderId=stored;return stored;}
+  try{
+    const r=await api('createDriveFolder',{});
+    if(r&&r.success){
+      S.wellness.folderId=r.folderId;
+      localStorage.setItem('ht_wellness_folder',r.folderId);
+      return r.folderId;
+    }
+  }catch(e){}
+  return null;
+}
+
+async function uploadToDrive(file, type){
+  const el=document.getElementById('scr');
+  // Show upload status
+  const statusEl=document.getElementById('upload-status-'+type);
+  if(statusEl) statusEl.textContent='Uploading...';
+
+  try{
+    const token=await initGoogleAuth();
+    if(!token){
+      if(statusEl) statusEl.textContent='Auth failed';
+      return null;
+    }
+    const folderId=await ensureDriveFolder();
+
+    // Read file as base64
+    const base64=await new Promise((res,rej)=>{
+      const reader=new FileReader();
+      reader.onload=e=>res(e.target.result.split(',')[1]);
+      reader.onerror=rej;
+      reader.readAsDataURL(file);
+    });
+
+    // Upload via Drive API multipart
+    const meta=JSON.stringify({
+      name: type+'_'+S.wellness.date.replace(/\//g,'-')+'_'+file.name,
+      parents: folderId?[folderId]:[]
+    });
+    const boundary='bound'+Date.now();
+    const parts=['--'+boundary,'Content-Type: application/json','',meta,'--'+boundary,'Content-Type: '+file.type,'Content-Transfer-Encoding: base64','',base64,'--'+boundary+'--'];
+    const body=parts.join('\r\n');
+
+    const resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+      method:'POST',
+      headers:{
+        'Authorization':'Bearer '+token,
+        'Content-Type':'multipart/related; boundary='+boundary
+      },
+      body
+    });
+    const data=await resp.json();
+    if(data.id){
+      // Make file viewable by anyone with link
+      await fetch('https://www.googleapis.com/drive/v3/files/'+data.id+'/permissions',{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({role:'reader',type:'anyone'})
+      });
+      const link='https://drive.google.com/file/d/'+data.id+'/view';
+      if(statusEl) statusEl.textContent='✓ Uploaded';
+      return link;
+    }
+  }catch(e){
+    if(statusEl) statusEl.textContent='Upload failed: '+e.message;
+  }
+  return null;
+}
+
+async function handleFileUpload(input, type){
+  const file=input.files[0];
+  if(!file) return;
+  const link=await uploadToDrive(file,type);
+  if(link){
+    if(type==='prescription') S.wellness.prescriptionLink=link;
+    else S.wellness.reportLink=link;
+    reWellness();
+  }
+}
+
+// ── Render Wellness ───────────────────────────────────────────
+function reWellness(){
+  const el=document.getElementById('scr');
+  if(el) el.innerHTML=renderWellness();
+}
+
+function renderWellness(){
+  const w=S.wellness;
+  const selectStyle=`width:100%;padding:9px 10px;border-radius:10px;
+    border:1px solid var(--border);background:var(--card);color:var(--text);
+    font-family:inherit;font-size:13px;outline:none;`;
+
+  const optParts=BODY_PARTS.map(p=>`<option value="${p}">${p}</option>`).join('');
+  const optSides=SIDES.map(s=>`<option value="${s}">${s}</option>`).join('');
+  const optSyms=SYMPTOMS.map(s=>`<option value="${s}">${s}</option>`).join('');
+
+  // Symptoms section
+  const symptomsHTML=w.symptoms.map((sym,i)=>`
+  <div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;
+    border:1px solid ${sym.part||sym.type?'var(--accent)':'var(--border)'}">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:8px">
+      SYMPTOM ${i+1}${sym.part&&sym.type?' — '+sym.part+' '+sym.side+' '+sym.type:''}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      <select style="${selectStyle}" onchange="S.wellness.symptoms[${i}].part=this.value;reWellness()">
+        <option value="">Body Part</option>${optParts}
+        ${BODY_PARTS.map(p=>`<option value="${p}" ${sym.part===p?'selected':''}>${p}</option>`).join('')}
+      </select>
+      <select style="${selectStyle}" onchange="S.wellness.symptoms[${i}].side=this.value">
+        <option value="">Side</option>
+        ${SIDES.map(s=>`<option value="${s}" ${sym.side===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <select style="${selectStyle}" onchange="S.wellness.symptoms[${i}].type=this.value;reWellness()">
+        <option value="">Symptom</option>
+        ${SYMPTOMS.map(s=>`<option value="${s}" ${sym.type===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+  </div>`).join('');
+
+  // Medicines section
+  const medsHTML=w.medicines.map((med,i)=>`
+  <div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;
+    border:1px solid ${med.name?'var(--blue)':'var(--border)'}">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:8px">
+      MEDICINE ${i+1}${med.name?' — '+med.name:''}</div>
+    <input type="text" placeholder="Medicine name" value="${med.name}"
+      oninput="S.wellness.medicines[${i}].name=this.value;reWellness()"
+      style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);
+        background:var(--card);color:var(--text);font-family:inherit;font-size:13px;
+        outline:none;margin-bottom:6px"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      <input type="text" placeholder="Dosage (e.g. 1 tab)" value="${med.dose}"
+        oninput="S.wellness.medicines[${i}].dose=this.value"
+        style="${selectStyle}margin-bottom:0"/>
+      <input type="text" placeholder="Frequency" value="${med.freq}"
+        oninput="S.wellness.medicines[${i}].freq=this.value"
+        style="${selectStyle}margin-bottom:0"/>
+      <input type="text" placeholder="Duration" value="${med.duration}"
+        oninput="S.wellness.medicines[${i}].duration=this.value"
+        style="${selectStyle}margin-bottom:0"/>
+    </div>
+  </div>`).join('');
+
+  // History
+  const histHTML=(w.entries||[]).slice(0,10).map(e=>`
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:14px;margin-bottom:10px;cursor:pointer"
+    onclick="loadWellnessEntry('${e.date}')">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="color:var(--accent);font-weight:700;font-size:13px">${e.date}</span>
+      ${e.doctor?`<span style="color:var(--muted);font-size:11px">Dr. ${e.doctor}</span>`:''}
+    </div>
+    ${e.symptoms.filter(s=>s.type).map(s=>
+      `<span style="font-size:11px;padding:2px 8px;border-radius:99px;margin-right:4px;
+        background:rgba(255,107,53,0.15);color:var(--orange)">${s.part} ${s.side} ${s.type}</span>`
+    ).join('')}
+    ${e.medicines.filter(m=>m.name).length?`
+    <div style="color:var(--muted);font-size:11px;margin-top:6px">
+      💊 ${e.medicines.filter(m=>m.name).map(m=>m.name).join(', ')}</div>`:''}
+  </div>`).join('');
+
+  return`<div class="pad" style="padding-bottom:100px">
+  <div style="font-size:22px;font-weight:800;margin-bottom:4px">Wellness</div>
+  <div style="color:var(--muted);font-size:12px;margin-bottom:16px">Track symptoms, doctor visits & medicines</div>
+
+  <!-- Toggle form/history -->
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button onclick="S.wellness.showHistory=false;reWellness()"
+      style="flex:1;padding:10px;border-radius:12px;border:none;cursor:pointer;font-family:inherit;
+        font-size:13px;font-weight:${!w.showHistory?700:400};
+        background:${!w.showHistory?'var(--accent)':'var(--card)'};
+        color:${!w.showHistory?'#0A0F1E':'var(--muted)'}">
+      + New Entry</button>
+    <button onclick="S.wellness.showHistory=true;S.wellness.entries=null;loadWellness().then(reWellness)"
+      style="flex:1;padding:10px;border-radius:12px;border:none;cursor:pointer;font-family:inherit;
+        font-size:13px;font-weight:${w.showHistory?700:400};
+        background:${w.showHistory?'var(--accent)':'var(--card)'};
+        color:${w.showHistory?'#0A0F1E':'var(--muted)'}">
+      History</button>
+  </div>
+
+  ${w.showHistory?`
+  <!-- History view -->
+  <div>
+    ${histHTML||'<div style="color:var(--muted);text-align:center;padding:40px 0">No wellness entries yet</div>'}
+  </div>
+  `:` 
+  <!-- New entry form -->
+
+  ${w.done?`<div style="background:var(--adim);border:1px solid var(--accent);border-radius:14px;
+    padding:14px;margin-bottom:16px">
+    <div style="color:var(--accent);font-weight:700">&#10003; Wellness entry saved!</div>
+    <div style="color:var(--muted);font-size:12px;margin-top:4px">${w.date}</div>
+  </div>`:''}
+
+  <!-- Date -->
+  <div style="margin-bottom:16px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:6px">DATE</div>
+    <input type="date" value="${dateToISO(w.date)}" onchange="S.wellness.date=isoToDate(this.value)"
+      style="width:100%;padding:12px 16px;border-radius:14px;border:1px solid var(--border);
+        background:var(--card);color:var(--text);font-family:inherit;font-size:15px;
+        font-weight:600;outline:none"/>
+  </div>
+
+  <!-- Doctor & Cause -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+    <div>
+      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:6px">DOCTOR CONSULTED</div>
+      <input type="text" placeholder="Dr. Name" value="${w.doctor}"
+        oninput="S.wellness.doctor=this.value"
+        style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
+          background:var(--card);color:var(--text);font-family:inherit;font-size:13px;outline:none"/>
+    </div>
+    <div>
+      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:6px">CAUSE</div>
+      <input type="text" placeholder="e.g. Infection" value="${w.cause}"
+        oninput="S.wellness.cause=this.value"
+        style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
+          background:var(--card);color:var(--text);font-family:inherit;font-size:13px;outline:none"/>
+    </div>
+  </div>
+
+  <!-- Symptoms -->
+  <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px">SYMPTOMS (UP TO 5)</div>
+  ${symptomsHTML}
+
+  <!-- Medicines -->
+  <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px;margin-top:6px">MEDICINES (UP TO 5)</div>
+  ${medsHTML}
+
+  <!-- Notes -->
+  <div style="margin-bottom:16px">
+    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:6px">NOTES</div>
+    <textarea placeholder="Additional notes..." rows="3"
+      oninput="S.wellness.notes=this.value"
+      style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
+        background:var(--card);color:var(--text);font-family:inherit;font-size:13px;
+        outline:none;resize:none">${w.notes}</textarea>
+  </div>
+
+  <!-- File uploads -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
+      <div style="font-size:24px;margin-bottom:6px">📋</div>
+      <div style="color:var(--text);font-size:12px;font-weight:600;margin-bottom:4px">Prescription</div>
+      ${w.prescriptionLink?`<div style="color:var(--accent);font-size:10px;margin-bottom:6px">✓ Uploaded</div>
+        <a href="${w.prescriptionLink}" target="_blank"
+          style="color:var(--accent);font-size:10px;text-decoration:underline">View</a>`:
+        `<div id="upload-status-prescription" style="color:var(--muted);font-size:10px;margin-bottom:6px"></div>`}
+      <label style="display:block;margin-top:8px;padding:7px 12px;border-radius:10px;
+        background:var(--surface);border:1px solid var(--border);color:var(--muted);
+        font-size:12px;cursor:pointer">
+        ${w.prescriptionLink?'Replace':'Upload'}
+        <input type="file" accept="image/*,.pdf" style="display:none"
+          onchange="handleFileUpload(this,'prescription')"/>
+      </label>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
+      <div style="font-size:24px;margin-bottom:6px">🔬</div>
+      <div style="color:var(--text);font-size:12px;font-weight:600;margin-bottom:4px">Test Report</div>
+      ${w.reportLink?`<div style="color:var(--accent);font-size:10px;margin-bottom:6px">✓ Uploaded</div>
+        <a href="${w.reportLink}" target="_blank"
+          style="color:var(--accent);font-size:10px;text-decoration:underline">View</a>`:
+        `<div id="upload-status-report" style="color:var(--muted);font-size:10px;margin-bottom:6px"></div>`}
+      <label style="display:block;margin-top:8px;padding:7px 12px;border-radius:10px;
+        background:var(--surface);border:1px solid var(--border);color:var(--muted);
+        font-size:12px;cursor:pointer">
+        ${w.reportLink?'Replace':'Upload'}
+        <input type="file" accept="image/*,.pdf" style="display:none"
+          onchange="handleFileUpload(this,'report')"/>
+      </label>
+    </div>
+  </div>
+
+  ${w.error?`<div style="color:var(--danger);font-size:13px;margin-bottom:12px">&#10007; ${w.error}</div>`:''}
+  `}
+  </div>
+
+  <!-- Save bar -->
+  ${!w.showHistory?`<div class="logbar">
+    <div>
+      <div style="color:var(--accent);font-weight:800;font-size:16px">Wellness Log</div>
+      <div style="color:var(--muted);font-size:11px">${w.date}</div>
+    </div>
+    <button onclick="submitWellness()" ${w.saving?'disabled':''}
+      style="background:var(--accent);border:none;border-radius:12px;
+        padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;
+        cursor:pointer;font-family:inherit">
+      ${w.saving?'Saving...':'Save &#8594;'}</button>
+  </div>`:''}`;
+}
+
+function loadWellnessEntry(date){
+  const entry=S.wellness.entries?.find(e=>e.date===date);
+  if(!entry) return;
+  // Pad arrays to 5
+  const syms=[...entry.symptoms];
+  while(syms.length<5) syms.push({part:'',side:'',type:''});
+  const meds=[...entry.medicines];
+  while(meds.length<5) meds.push({name:'',dose:'',freq:'',duration:''});
+  S.wellness={
+    ...S.wellness,
+    date:entry.date, doctor:entry.doctor, cause:entry.cause,
+    notes:entry.notes, symptoms:syms, medicines:meds,
+    prescriptionLink:entry.prescriptionLink,
+    reportLink:entry.reportLink,
+    showHistory:false, done:false, error:''
+  };
+  reWellness();
+}
+
+async function submitWellness(){
+  const w=S.wellness;
+  const hasSymptom=w.symptoms.some(s=>s.type);
+  if(!hasSymptom && !w.doctor && !w.cause){
+    S.wellness.error='Please add at least one symptom or doctor/cause';
+    reWellness(); return;
+  }
+  S.wellness.saving=true; S.wellness.error=''; reWellness();
+  if(isSetup()){
+    S.wellness.saving=false; S.wellness.done=true;
+    S.wellness.entries=null; reWellness(); return;
+  }
+  try{
+    const r=await api('logWellness',{
+      date:w.date, doctor:w.doctor, cause:w.cause, notes:w.notes,
+      symptoms:w.symptoms, medicines:w.medicines,
+      prescriptionLink:w.prescriptionLink, reportLink:w.reportLink
+    });
+    if(r&&r.success){
+      S.wellness.saving=false; S.wellness.done=true;
+      S.wellness.entries=null; // force refresh
+      // Reset form for next entry
+      setTimeout(()=>{
+        S.wellness={
+          ...S.wellness,
+          date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})(),
+          doctor:'',cause:'',notes:'',
+          symptoms:Array(5).fill(null).map(()=>({part:'',side:'',type:''})),
+          medicines:Array(5).fill(null).map(()=>({name:'',dose:'',freq:'',duration:''})),
+          prescriptionLink:'',reportLink:'',done:false
+        };
+        reWellness();
+      },2000);
+    } else {
+      S.wellness.saving=false;
+      S.wellness.error=r?.error||'Save failed';
+      reWellness();
+    }
+  }catch(e){
+    S.wellness.saving=false;
+    S.wellness.error='Error: '+e.message;
+    reWellness();
+  }
+}
+
+// ── Chart builders ───────────────────────────────────────────
+const CG="#1E2A45",CT="#6B7A9F";
+const cOpts={responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false}},
+  scales:{x:{grid:{color:CG},ticks:{color:CT,font:{size:9},maxRotation:0}},
+          y:{grid:{color:CG},ticks:{color:CT,font:{size:9}}}}};
+
+function getActuals(){return(S.dash?.actuals||[]).filter(a=>a.kcalIn>0);}
+
+function killCharts(){Object.values(S.charts).forEach(c=>{try{c.destroy()}catch(e){}});S.charts={};}
+
+function buildSparkline(){
+  const ctx=document.getElementById("sparkChart");if(!ctx)return;
+  const a=getActuals();
+  S.charts.spark=new Chart(ctx,{type:"line",data:{
+    labels:a.map(d=>d.date.slice(0,5)),
+    datasets:[{data:a.map(d=>d.kcalIn),borderColor:"#00E5A0",
+      backgroundColor:"rgba(0,229,160,0.07)",borderWidth:2,pointRadius:0,fill:true,tension:0.4}]
+  },options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{enabled:false}},
+    scales:{x:{display:false},y:{display:false}}}});
+}
+function buildCalChart(){
+  const ctx=document.getElementById("calChart");if(!ctx)return;
+  const a=getActuals();
+  S.charts.cal=new Chart(ctx,{type:"line",data:{
+    labels:a.map(d=>d.date.slice(0,5)),
+    datasets:[{label:"kcal",data:a.map(d=>d.kcalIn),borderColor:"#00E5A0",
+      backgroundColor:"rgba(0,229,160,0.08)",borderWidth:2.5,
+      pointRadius:3,pointBackgroundColor:"#00E5A0",fill:true,tension:0.4}]
+  },options:{...cOpts}});
+}
+function buildProtChart(){
+  const ctx=document.getElementById("protChart");if(!ctx)return;
+  const a=getActuals();
+  S.charts.prot=new Chart(ctx,{type:"line",data:{
+    labels:a.map(d=>d.date.slice(0,5)),
+    datasets:[{label:"protein (g)",data:a.map(d=>d.protein),borderColor:"#4A9FFF",
+      backgroundColor:"rgba(74,159,255,0.08)",borderWidth:2.5,
+      pointRadius:3,pointBackgroundColor:"#4A9FFF",fill:true,tension:0.4}]
+  },options:{...cOpts}});
+}
+function buildBarChart(){
+  const ctx=document.getElementById("barChart");if(!ctx)return;
+  const a=getActuals();
+  S.charts.bar=new Chart(ctx,{type:"bar",data:{
+    labels:a.map(d=>d.date.slice(0,5)),
+    datasets:[
+      {label:"kcal",data:a.map(d=>d.kcalIn),backgroundColor:"rgba(0,229,160,0.7)",borderRadius:4},
+      {label:"protein (g)",data:a.map(d=>d.protein),backgroundColor:"rgba(74,159,255,0.7)",borderRadius:4},
+    ]
+  },options:{...cOpts,plugins:{legend:{labels:{color:CT,font:{size:10}}}}}});
+}
+
+// ── App Init ─────────────────────────────────────────────────
+(function(){
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+  s.async=true;
+  s.onload=function(){
+    if(!API) showSetupPopup();
+    else _go(window._qNav||'home');
+  };
+  s.onerror=function(){
+    if(!API) showSetupPopup();
+    else _go(window._qNav||'home');
+  };
+  document.head.appendChild(s);
+})();
+
+// Inject font non-blocking
+(function(){
+  var l=document.createElement('link');
+  l.rel='stylesheet';
+  l.href='https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap';
+  document.head.appendChild(l);
+})();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+
+<!-- Setup Popup -->
+<div id="setup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);
+  z-index:999;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:#161D2F;border:1px solid #1E2A45;border-radius:24px;
+    padding:28px 24px;width:100%;max-width:390px;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <div style="font-size:36px;text-align:center;margin-bottom:16px">&#9881;&#65039;</div>
+    <div style="font-size:20px;font-weight:800;color:#F0F4FF;text-align:center;margin-bottom:8px">
+      Connect Your Drive</div>
+    <div style="font-size:13px;color:#6B7A9F;text-align:center;line-height:1.6;margin-bottom:24px">
+      Paste your Google Apps Script Web App URL below.<br/>
+      <span style="color:#00E5A0">script.google.com</span> &rarr; Deploy &rarr; Web App &rarr; Copy URL
+    </div>
+    <input id="api-url-input" type="url"
+      placeholder="https://script.google.com/macros/s/..."
+      style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid #1E2A45;
+        background:#111827;color:#F0F4FF;font-size:13px;font-family:inherit;
+        outline:none;margin-bottom:8px"
+      onkeydown="if(event.key==='Enter')saveApiUrl()"/>
+    <div id="url-error" style="color:#FF4757;font-size:12px;margin-bottom:12px;display:none">
+      Please enter a valid Apps Script URL</div>
+    <button onclick="saveApiUrl()" style="width:100%;padding:15px;border-radius:14px;border:none;
+      background:linear-gradient(135deg,#00E5A0,#00C98A);color:#0A0F1E;font-weight:800;
+      font-size:15px;cursor:pointer;font-family:inherit;margin-bottom:12px">
+      Connect &rarr;
+    </button>
+    <button onclick="skipSetup()" style="width:100%;padding:12px;border-radius:14px;border:none;
+      background:transparent;color:#6B7A9F;font-size:13px;cursor:pointer;font-family:inherit">
+      Skip &mdash; use sample data
+    </button>
+  </div>
+</div>
+
+<script>
+function showSetupPopup(){
+  var el=document.getElementById('setup-overlay');
+  el.style.display='flex';
+  setTimeout(function(){document.getElementById('api-url-input').focus();},100);
+}
+function saveApiUrl(){
+  var val=document.getElementById('api-url-input').value.trim();
+  var err=document.getElementById('url-error');
+  if(!val||!val.startsWith('https://script.google.com')){
+    err.style.display='block'; return;
+  }
+  err.style.display='none';
+  API=val;
+  localStorage.setItem('ht_api_url',val);
+  sessionStorage.setItem('ht_api_url',val);
+  document.getElementById('setup-overlay').style.display='none';
+  _go('home');
+}
+function skipSetup(){
+  document.getElementById('setup-overlay').style.display='none';
+  _go('home');
+}
+function resetApiUrl(){
+  localStorage.removeItem('ht_api_url');
+  sessionStorage.removeItem('ht_api_url');
+  API='';
+  showSetupPopup();
+}
+</script>
+</body>
+</html>
