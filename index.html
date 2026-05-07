@@ -35,9 +35,9 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);
   border-top:1px solid var(--border);display:flex;
   padding:8px 0 calc(8px + var(--safe-b));z-index:200;}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;
-  gap:3px;background:none;border:none;cursor:pointer;padding:4px 0;}
+  gap:2px;background:none;border:none;cursor:pointer;padding:3px 0;}
 .nb:active{opacity:.7;}
-.ni{font-size:20px;color:var(--muted);transition:color .2s;}
+.ni{font-size:18px;color:var(--muted);transition:color .2s;}
 .nl{font-size:9px;letter-spacing:.5px;color:var(--muted);font-weight:400;}
 .nb.on .ni,.nb.on .nl{color:var(--accent);}
 .nb.on .nl{font-weight:700;}
@@ -123,6 +123,7 @@ function go(s){ if(typeof _go==="function") _go(s); else window._qNav=s; }
     <button class="nb" data-s="log" onclick="go('log')"><span class="ni">✚</span><span class="nl">Log</span></button>
     <button class="nb" data-s="trends" onclick="go('trends')"><span class="ni">↗</span><span class="nl">Trends</span></button>
     <button class="nb" data-s="foods" onclick="go('foods')"><span class="ni">◎</span><span class="nl">Foods</span></button>
+    <button class="nb" data-s="wellness" onclick="go('wellness')"><span class="ni">🩺</span><span class="nl">Wellness</span></button>
     <button class="nb" data-s="metrics" onclick="go('metrics')"><span class="ni">♡</span><span class="nl">Metrics</span></button>
   </nav>
 </div>
