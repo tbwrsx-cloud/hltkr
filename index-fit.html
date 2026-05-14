@@ -406,7 +406,7 @@ function renderHome(){
           <div style="color:var(--muted);font-size:10px;letter-spacing:1px">DISTANCE</div>
         </div>
       </div>
-      ${S.fit.steps===null?`<div style="text-align:center;margin-top:8px">
+      ${S.fit.lastFetch===0?`<div style="text-align:center;margin-top:8px">
         <button onclick="initGoogleAuth().then(t=>t&&fetchFitData().then(()=>_go('home')))"
           style="padding:6px 16px;border-radius:99px;border:1px solid var(--blue);
             background:rgba(74,159,255,0.1);color:var(--blue);font-size:11px;
@@ -1414,11 +1414,15 @@ async function fetchFitData(days=30){
     // Parse all daily buckets
     const daily = [];
     let todaySteps = 0, todayCals = 0;
-    const todayStr = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'});
+    const now2 = new Date();
+    const todayStr = String(now2.getDate()).padStart(2,'0')+'/'+String(now2.getMonth()+1).padStart(2,'0');
 
     (data.bucket||[]).forEach(bucket => {
       const bucketDate = new Date(parseInt(bucket.startTimeMillis));
-      const label = bucketDate.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'});
+      // Use local date (not UTC) for label matching
+      const localMs = parseInt(bucket.startTimeMillis) + (new Date().getTimezoneOffset()*-60000);
+      const localDate = new Date(localMs);
+      const label = String(localDate.getDate()).padStart(2,'0')+'/'+String(localDate.getMonth()+1).padStart(2,'0');
       let steps=0, calories=0;
       (bucket.dataset||[]).forEach(ds=>{
         (ds.point||[]).forEach(pt=>{
@@ -1434,7 +1438,7 @@ async function fetchFitData(days=30){
       if(label===todayStr){ todaySteps=steps; todayCals=Math.round(calories); }
     });
 
-    S.fit.steps          = todaySteps;
+    S.fit.steps          = todaySteps; // 0 is valid (no steps yet today)
     S.fit.caloriesBurned = todayCals;
     S.fit.daily          = daily; // 30-day history
     S.fit.lastFetch      = Date.now();
@@ -1477,6 +1481,13 @@ async function loadWellness(){
 // ── Google OAuth for Drive upload ─────────────────────────────
 function initGoogleAuth(){
   return new Promise((resolve)=>{
+    // Check scope version - if token was issued before Fit scope, force re-auth
+    const SCOPE_VERSION='2'; // increment when scopes change
+    if(localStorage.getItem('ht_scope_version')!==SCOPE_VERSION){
+      localStorage.removeItem('ht_drive_token');
+      localStorage.removeItem('ht_drive_token_expiry');
+      localStorage.setItem('ht_scope_version',SCOPE_VERSION);
+    }
     // Check cached token
     if(S.wellness.driveToken){resolve(S.wellness.driveToken);return;}
     const stored=localStorage.getItem('ht_drive_token');
