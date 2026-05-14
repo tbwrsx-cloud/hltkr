@@ -2,7 +2,7 @@
   "name": "HealthTrack",
   "short_name": "HealthTrack",
   "description": "Personal health & diet tracker",
-  "start_url": "/hltkr/index.html",
+  "start_url": "/hltkr/index-fit.html",
   "scope": "/hltkr/",
   "display": "standalone",
   "background_color": "#0A0F1E",
