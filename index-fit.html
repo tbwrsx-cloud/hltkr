@@ -176,7 +176,7 @@ let S={
   metrics:{weight:"",hba1c:"",ldl:"",trig:""},
   metricsDone:false,
   lastSave:null,
-  fit:{steps:null,caloriesBurned:null,distance:null,loading:false,lastFetch:0},
+  fit:{steps:null,caloriesBurned:null,distance:null,daily:[],loading:false,lastFetch:0},
   wellness:{
     date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})(),
     doctor:'', cause:'', notes:'',
@@ -314,7 +314,7 @@ async function _go(screen){
   el.innerHTML=ld(); el.scrollTop=0;
   if(screen==="home"){S.today=null;await Promise.all([loadDash(),loadToday(),loadPlan()]);fetchFitData().then(()=>el.innerHTML=renderHome());el.innerHTML=renderHome();}
   else if(screen==="log"){S.plan=null;await Promise.all([loadFoods(),loadPlan()]);el.innerHTML=renderLog();}
-  else if(screen==="trends"){S.dash=null;await Promise.all([loadDash(),loadWellness()]);el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();buildWellnessChart();});}
+  else if(screen==="trends"){S.dash=null;await Promise.all([loadDash(),loadWellness()]);el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();buildWellnessChart();buildStepsChart();buildCalsBurnedChart();});}
   else if(screen==="foods"){await loadFoods();el.innerHTML=renderFoods();}
   else if(screen==="metrics"){el.innerHTML=renderMetrics();}
   else if(screen==="wellness"){await loadWellness();el.innerHTML=renderWellness();}
@@ -1372,22 +1372,21 @@ async function submitAddFood(){
 
 
 // ── Google Fit API ────────────────────────────────────────────
-async function fetchFitData(){
-  // Don't refetch more than once per 30 mins
+async function fetchFitData(days=30){
   if(S.fit.loading) return;
+  // Use cache if recent (30 min)
   if(S.fit.steps!==null && Date.now()-S.fit.lastFetch < 30*60*1000) return;
 
   const token = localStorage.getItem('ht_drive_token');
   const expiry = localStorage.getItem('ht_drive_token_expiry');
-  if(!token || !expiry || Date.now()>parseInt(expiry)) return; // no token yet
+  if(!token || !expiry || Date.now()>parseInt(expiry)) return;
 
   S.fit.loading=true;
 
   try{
-    // Get today's date range in milliseconds
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const endOfDay   = startOfDay + 24*60*60*1000 - 1;
+    const now     = new Date();
+    const endOfDay   = new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59).getTime();
+    const startDay   = new Date(now.getFullYear(),now.getMonth(),now.getDate()-days+1,0,0,0).getTime();
 
     const body = {
       aggregateBy: [
@@ -1395,7 +1394,7 @@ async function fetchFitData(){
         { dataTypeName: "com.google.calories.expended" }
       ],
       bucketByTime: { durationMillis: 86400000 },
-      startTimeMillis: startOfDay,
+      startTimeMillis: startDay,
       endTimeMillis: endOfDay
     };
 
@@ -1412,23 +1411,35 @@ async function fetchFitData(){
     );
     const data = await resp.json();
 
-    let steps = 0, calories = 0;
-    if(data.bucket && data.bucket[0]) {
-      const datasets = data.bucket[0].dataset || [];
-      datasets.forEach(ds => {
-        (ds.point||[]).forEach(pt => {
-          (pt.value||[]).forEach(v => {
-            if(ds.dataSourceId.includes('step_count')) steps += (v.intVal||0);
-            if(ds.dataSourceId.includes('calories'))   calories += (v.fpVal||0);
+    // Parse all daily buckets
+    const daily = [];
+    let todaySteps = 0, todayCals = 0;
+    const todayStr = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'});
+
+    (data.bucket||[]).forEach(bucket => {
+      const bucketDate = new Date(parseInt(bucket.startTimeMillis));
+      const label = bucketDate.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'});
+      let steps=0, calories=0;
+      (bucket.dataset||[]).forEach(ds=>{
+        (ds.point||[]).forEach(pt=>{
+          (pt.value||[]).forEach(v=>{
+            if(ds.dataSourceId.includes('step_count')) steps+=(v.intVal||0);
+            if(ds.dataSourceId.includes('calories'))   calories+=(v.fpVal||0);
           });
         });
       });
-    }
+      if(steps>0||calories>0){
+        daily.push({date:label,steps,calories:Math.round(calories)});
+      }
+      if(label===todayStr){ todaySteps=steps; todayCals=Math.round(calories); }
+    });
 
-    S.fit.steps          = steps;
-    S.fit.caloriesBurned = Math.round(calories);
+    S.fit.steps          = todaySteps;
+    S.fit.caloriesBurned = todayCals;
+    S.fit.daily          = daily; // 30-day history
     S.fit.lastFetch      = Date.now();
     S.fit.loading        = false;
+
   } catch(e){
     console.error('Fit API error:', e);
     S.fit.loading = false;
@@ -2054,6 +2065,78 @@ function buildWellnessChart(){
         x:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:10}}},
         y:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:10},
           stepSize:1,precision:0},min:0}
+      }
+    }
+  });
+}
+
+function buildStepsChart(){
+  const ctx=document.getElementById("stepsChart");if(!ctx)return;
+  const daily=S.fit.daily||[];
+  if(!daily.length) return;
+  if(S.charts.steps){try{S.charts.steps.destroy();}catch(e){}}
+  S.charts.steps=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:daily.map(d=>d.date),
+      datasets:[{
+        label:'Steps',
+        data:daily.map(d=>d.steps),
+        backgroundColor:daily.map(d=>d.steps>=10000?'rgba(0,229,160,0.8)':
+          d.steps>=5000?'rgba(74,159,255,0.7)':'rgba(167,139,250,0.6)'),
+        borderRadius:4,
+        borderSkipped:false
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          label:c=>`${c.raw.toLocaleString()} steps`+
+            (c.raw>=10000?' 🎯':'')
+        }}
+      },
+      scales:{
+        x:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:9},maxRotation:0}},
+        y:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:9},
+          callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v},min:0}
+      },
+      annotation:{annotations:{
+        goal:{type:'line',yMin:10000,yMax:10000,
+          borderColor:'rgba(0,229,160,0.4)',borderDash:[5,5]}
+      }}
+    }
+  });
+}
+
+function buildCalsBurnedChart(){
+  const ctx=document.getElementById("calsBurnedChart");if(!ctx)return;
+  const daily=S.fit.daily||[];
+  if(!daily.length) return;
+  if(S.charts.calsBurned){try{S.charts.calsBurned.destroy();}catch(e){}}
+  S.charts.calsBurned=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:daily.map(d=>d.date),
+      datasets:[{
+        label:'kcal burned',
+        data:daily.map(d=>d.calories),
+        borderColor:'#FF6B35',
+        backgroundColor:'rgba(255,107,53,0.08)',
+        borderWidth:2.5,
+        pointRadius:3,
+        pointBackgroundColor:'#FF6B35',
+        fill:true,
+        tension:0.4
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:9},maxRotation:0}},
+        y:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:9}},min:0}
       }
     }
   });
