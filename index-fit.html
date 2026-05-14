@@ -314,7 +314,7 @@ async function _go(screen){
   el.innerHTML=ld(); el.scrollTop=0;
   if(screen==="home"){S.today=null;await Promise.all([loadDash(),loadToday(),loadPlan()]);fetchFitData().then(()=>el.innerHTML=renderHome());el.innerHTML=renderHome();}
   else if(screen==="log"){S.plan=null;await Promise.all([loadFoods(),loadPlan()]);el.innerHTML=renderLog();}
-  else if(screen==="trends"){S.dash=null;await Promise.all([loadDash(),loadWellness()]);el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();buildWellnessChart();buildStepsChart();buildCalsBurnedChart();});}
+  else if(screen==="trends"){S.dash=null;S.fit.lastFetch=0;await Promise.all([loadDash(),loadWellness(),fetchFitData()]);el.innerHTML=renderTrends();requestAnimationFrame(()=>{buildCalChart();buildProtChart();buildBarChart();buildWellnessChart();buildStepsChart();buildCalsBurnedChart();});}
   else if(screen==="foods"){await loadFoods();el.innerHTML=renderFoods();}
   else if(screen==="metrics"){el.innerHTML=renderMetrics();}
   else if(screen==="wellness"){await loadWellness();el.innerHTML=renderWellness();}
@@ -827,6 +827,68 @@ function renderTrends(){
       </div>
     </div>`).join('')}
   </div>`:''}
+
+  <!-- Steps last 7 days -->
+  ${(S.fit.daily&&S.fit.daily.length)?`
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+      <div class="ct">Steps — Last 7 Days</div>
+      <div style="text-align:right">
+        <div style="color:var(--blue);font-weight:700;font-size:15px">
+          ${fmtSteps(S.fit.steps)} today</div>
+        <div style="color:var(--muted);font-size:10px">
+          avg ${fmtSteps(Math.round(S.fit.daily.slice(-7).reduce((s,d)=>s+d.steps,0)/Math.min(7,S.fit.daily.length)))}/day</div>
+      </div>
+    </div>
+    <div class="cs">&#9646; Green ≥10k &nbsp;&#9646; Blue 5-10k &nbsp;&#9646; Purple &lt;5k</div>
+    <div style="height:170px"><canvas id="stepsChart"></canvas></div>
+    <div style="display:flex;justify-content:space-around;margin-top:12px;
+      padding-top:10px;border-top:1px solid var(--border);text-align:center">
+      <div>
+        <div style="color:var(--blue);font-weight:700;font-size:15px">
+          ${fmtSteps(S.fit.daily.slice(-7).reduce((s,d)=>s+d.steps,0))}</div>
+        <div style="color:var(--muted);font-size:10px">7-day total</div>
+      </div>
+      <div>
+        <div style="color:var(--accent);font-weight:700;font-size:15px">
+          ${S.fit.daily.slice(-7).filter(d=>d.steps>=10000).length}/7</div>
+        <div style="color:var(--muted);font-size:10px">goal days</div>
+      </div>
+      <div>
+        <div style="color:var(--purple);font-weight:700;font-size:15px">
+          ~${(S.fit.daily.slice(-7).reduce((s,d)=>s+d.steps,0)*0.000762).toFixed(1)}km</div>
+        <div style="color:var(--muted);font-size:10px">distance</div>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="color:var(--muted);font-size:11px">Today toward 10k</span>
+        <span style="color:var(--blue);font-size:11px;font-weight:600">
+          ${fmtSteps(S.fit.steps||0)} / 10k</span>
+      </div>
+      <div style="height:8px;border-radius:99px;background:var(--border);overflow:hidden">
+        <div style="width:${Math.min(100,Math.round((S.fit.steps||0)/10000*100))}%;
+          height:100%;border-radius:99px;
+          background:linear-gradient(90deg,var(--blue),var(--accent));
+          transition:width 1.2s ease"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+      <div class="ct">Calories Burned — Last 7 Days</div>
+      <div style="text-align:right">
+        <div style="color:var(--orange);font-weight:700;font-size:15px">
+          ${S.fit.caloriesBurned?fmt(S.fit.caloriesBurned)+' today':'--'}</div>
+        <div style="color:var(--muted);font-size:10px">
+          avg ${fmt(Math.round(S.fit.daily.slice(-7).reduce((s,d)=>s+d.calories,0)/Math.min(7,S.fit.daily.length)))}/day</div>
+      </div>
+    </div>
+    <div class="cs">Total daily calories burned from Google Fit</div>
+    <div style="height:150px"><canvas id="calsBurnedChart"></canvas></div>
+  </div>
+  `:''}
 
   <!-- Milestones -->
   <div class="card">
@@ -2083,7 +2145,8 @@ function buildWellnessChart(){
 
 function buildStepsChart(){
   const ctx=document.getElementById("stepsChart");if(!ctx)return;
-  const daily=S.fit.daily||[];
+  const all=S.fit.daily||[];
+  const daily=all.slice(-7); // last 7 days only
   if(!daily.length) return;
   if(S.charts.steps){try{S.charts.steps.destroy();}catch(e){}}
   S.charts.steps=new Chart(ctx,{
@@ -2095,7 +2158,7 @@ function buildStepsChart(){
         data:daily.map(d=>d.steps),
         backgroundColor:daily.map(d=>d.steps>=10000?'rgba(0,229,160,0.8)':
           d.steps>=5000?'rgba(74,159,255,0.7)':'rgba(167,139,250,0.6)'),
-        borderRadius:4,
+        borderRadius:6,
         borderSkipped:false
       }]
     },
@@ -2123,7 +2186,8 @@ function buildStepsChart(){
 
 function buildCalsBurnedChart(){
   const ctx=document.getElementById("calsBurnedChart");if(!ctx)return;
-  const daily=S.fit.daily||[];
+  const all2=S.fit.daily||[];
+  const daily=all2.slice(-7);
   if(!daily.length) return;
   if(S.charts.calsBurned){try{S.charts.calsBurned.destroy();}catch(e){}}
   S.charts.calsBurned=new Chart(ctx,{
