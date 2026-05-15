@@ -1437,7 +1437,7 @@ async function submitAddFood(){
 async function fetchFitData(days=30){
   if(S.fit.loading) return;
   // Use cache if recent (30 min)
-  if(S.fit.steps!==null && Date.now()-S.fit.lastFetch < 30*60*1000) return;
+  if(S.fit.steps!==null && Date.now()-S.fit.lastFetch < 5*60*1000) return; // 5 min cache
 
   const token = localStorage.getItem('ht_drive_token');
   const expiry = localStorage.getItem('ht_drive_token_expiry');
@@ -1447,8 +1447,9 @@ async function fetchFitData(days=30){
 
   try{
     const now     = new Date();
-    const endOfDay   = new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59).getTime();
-    const startDay   = new Date(now.getFullYear(),now.getMonth(),now.getDate()-days+1,0,0,0).getTime();
+    // Use local midnight for bucket boundaries (device timezone = IST)
+    const endOfDay = new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59,999).getTime();
+    const startDay = new Date(now.getFullYear(),now.getMonth(),now.getDate()-(days-1),0,0,0,0).getTime();
 
     const body = {
       aggregateBy: [
