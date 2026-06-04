@@ -617,34 +617,17 @@ function renderLog(){
       <div style="position:relative">
         <input type="text" placeholder="&#128269; Search food for slot ${i+1}..."
           value="${sq}"
+          id="slot-input-${i}"
           oninput="setSlotSearch(${i},this.value)"
           style="width:100%;padding:11px 14px;border-radius:12px;
-            border:1px solid ${sq?'var(--accent)':'var(--border)'};
+            border:1px solid var(--border);
             background:var(--card);color:var(--text);
             font-family:inherit;font-size:13px;outline:none"/>
-        ${filtered.length?`
-        <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
-          background:var(--card);border:1px solid var(--accent);border-radius:12px;
-          overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
-          ${filtered.map((f,fi)=>`
-          <div onclick="pickSearchResult(${i},${fi})"
-            style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);
-              display:flex;justify-content:space-between;align-items:center">
-            <div style="flex:1">
-              <div style="color:var(--text);font-size:13px">${f.name}</div>
-              <div style="color:var(--muted);font-size:10px">${f.portion||''} &middot; ${f.category}</div>
-            </div>
-            <div style="text-align:right;margin-left:8px">
-              <div style="color:var(--accent);font-size:13px;font-weight:700">${f.cal}</div>
-              <div style="color:var(--blue);font-size:10px">${f.protein}g P</div>
-            </div>
-          </div>`).join('')}
-        </div>`:
-        sq.length>=1?`
-        <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
-          background:var(--card);border:1px solid var(--border);border-radius:12px;
-          padding:12px 14px;color:var(--muted);font-size:12px">
-          No match for "${sq}"</div>`:''}
+        <div id="slot-results-${i}"
+          style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
+            background:var(--card);border:1px solid var(--accent);border-radius:12px;
+            overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
+        </div>
       </div>`}
     </div>`;
   }).join('')}
@@ -1167,7 +1150,48 @@ function isPastDate(ddmmyyyy){
 function setSlotSearch(idx, val){
   if(!S.log.slotSearch) S.log.slotSearch={};
   S.log.slotSearch[idx]=val;
-  reLog();
+  // Don't call reLog() - just update the results dropdown in place
+  // so keyboard stays open on Android
+  updateSlotResults(idx, val);
+}
+
+function updateSlotResults(idx, val){
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  const meal=S.log.meal;
+  const mealFoods=[
+    ...foods.filter(f=>f.category===meal||f.category==='Anytime'),
+    ...foods.filter(f=>f.category!==meal&&f.category!=='Anytime')
+  ];
+  const filtered=val.length>0
+    ? mealFoods.filter(f=>f.name.toLowerCase().includes(val.toLowerCase())).slice(0,6)
+    : [];
+
+  const resultsEl=document.getElementById('slot-results-'+idx);
+  if(!resultsEl) return;
+
+  if(filtered.length>0){
+    resultsEl.style.display='block';
+    resultsEl.innerHTML=filtered.map((f,fi)=>`
+    <div onclick="pickSearchResult(${idx},${fi})"
+      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);
+        display:flex;justify-content:space-between;align-items:center">
+      <div style="flex:1">
+        <div style="color:var(--text);font-size:13px">${f.name}</div>
+        <div style="color:var(--muted);font-size:10px">${f.portion||''} &middot; ${f.category}</div>
+      </div>
+      <div style="text-align:right;margin-left:8px">
+        <div style="color:var(--accent);font-size:13px;font-weight:700">${f.cal}</div>
+        <div style="color:var(--blue);font-size:10px">${f.protein}g P</div>
+      </div>
+    </div>`).join('');
+  } else if(val.length>0){
+    resultsEl.style.display='block';
+    resultsEl.innerHTML=`<div style="padding:12px 14px;color:var(--muted);font-size:12px">
+      No match for "${val}"</div>`;
+  } else {
+    resultsEl.style.display='none';
+    resultsEl.innerHTML='';
+  }
 }
 
 function pickSearchResult(slotIdx, foodIdx){
