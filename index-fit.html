@@ -170,7 +170,7 @@ const FOOD_DB_LOCAL=[
 
 let S={
   screen:"home",dash:null,foods:null,today:null,plan:null,
-  log:{meal:"Breakfast",items:[null,null,null,null],search:"",date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})()},
+  log:{meal:"Breakfast",items:[null,null,null,null],slotSearch:{},search:"",date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})()},
   logDone:false,logResult:null,
   foodFilter:"All",
   metrics:{weight:"",hba1c:"",ldl:"",trig:""},
@@ -581,40 +581,71 @@ function renderLog(){
     No ${past?'record':'plan'} for ${meal} on ${date.slice(0,5)}
   </div>`}
 
-  <!-- 4 Food slots -->
+  <!-- 4 Food slots with search -->
   <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px">
     ${past?'EDIT RECORD (UP TO 4 ITEMS)':'SET ITEMS (UP TO 4)'}
   </div>
   ${[0,1,2,3].map(i=>{
     const sl=slots[i];
-    return`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px">
-      <div style="flex:1">
-        <select onchange="setSlotFood(${i},this.value)"
-          style="width:100%;padding:11px 12px;border-radius:12px;
-            border:1px solid ${sl.selected?'var(--accent)':'var(--border)'};
-            background:var(--card);color:${sl.selected?'var(--text)':'var(--muted)'};
-            font-family:inherit;font-size:13px;outline:none">
-          ${blankOpt}
-          ${mealFoods.map(f=>`<option value="${f.name.trim()}"
-            ${sl.selected.trim()===f.name.trim()?'selected':''}
-            >${f.name.trim()} (${f.cal} kcal)</option>`).join('')}
-        </select>
-        ${sl.food?`<div style="color:var(--muted);font-size:10px;margin-top:3px;padding-left:4px">
-          ${sl.food.cal} kcal &middot; ${sl.food.protein}g protein &middot; ${sl.food.portion||''}
-        </div>`:''}
-      </div>
-      ${sl.selected?`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px">
-        <div style="color:var(--muted);font-size:9px;letter-spacing:1px">QTY</div>
-        <input type="number" min="0.5" step="0.5" value="${sl.qty}"
-          onchange="setSlotQty(${i},this.value)"
-          style="width:58px;padding:8px 6px;border-radius:10px;border:1px solid var(--accent);
-            background:var(--surface);color:var(--accent);font-size:14px;
-            font-weight:700;text-align:center;font-family:inherit;outline:none"/>
+    const sq=(S.log.slotSearch||{})[i]||'';
+    const filtered=sq.length>0
+      ? mealFoods.filter(f=>f.name.toLowerCase().includes(sq.toLowerCase())).slice(0,6)
+      : [];
+    return`<div style="margin-bottom:12px">
+      ${sl.selected?`
+      <div style="display:flex;gap:8px;align-items:center;padding:10px 12px;
+        border-radius:12px;border:1px solid var(--accent);background:var(--adim)">
+        <div style="flex:1">
+          <div style="color:var(--text);font-size:13px;font-weight:600">${sl.food.name}</div>
+          <div style="color:var(--muted);font-size:10px;margin-top:2px">
+            ${sl.food.cal} kcal &middot; ${sl.food.protein}g P &middot; ${sl.food.portion||''}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div style="color:var(--muted);font-size:9px">QTY</div>
+          <input type="number" min="0.5" step="0.5" value="${sl.qty}"
+            onchange="setSlotQty(${i},this.value)"
+            style="width:52px;padding:6px 4px;border-radius:8px;border:1px solid var(--accent);
+              background:var(--surface);color:var(--accent);font-size:14px;
+              font-weight:700;text-align:center;font-family:inherit;outline:none"/>
+        </div>
         <button onclick="clearSlot(${i})"
-          style="width:58px;padding:3px 0;border-radius:8px;border:1px solid var(--border);
-            background:var(--surface);color:var(--muted);font-size:11px;
-            cursor:pointer;font-family:inherit">&#10005; clr</button>
-      </div>`:''}
+          style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);
+            background:var(--surface);color:var(--muted);font-size:14px;
+            cursor:pointer;font-family:inherit;line-height:1">&#10005;</button>
+      </div>
+      `:`
+      <div style="position:relative">
+        <input type="text" placeholder="&#128269; Search food for slot ${i+1}..."
+          value="${sq}"
+          oninput="setSlotSearch(${i},this.value)"
+          style="width:100%;padding:11px 14px;border-radius:12px;
+            border:1px solid ${sq?'var(--accent)':'var(--border)'};
+            background:var(--card);color:var(--text);
+            font-family:inherit;font-size:13px;outline:none"/>
+        ${filtered.length?`
+        <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
+          background:var(--card);border:1px solid var(--accent);border-radius:12px;
+          overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
+          ${filtered.map((f,fi)=>`
+          <div onclick="pickSearchResult(${i},${fi})"
+            style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);
+              display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1">
+              <div style="color:var(--text);font-size:13px">${f.name}</div>
+              <div style="color:var(--muted);font-size:10px">${f.portion||''} &middot; ${f.category}</div>
+            </div>
+            <div style="text-align:right;margin-left:8px">
+              <div style="color:var(--accent);font-size:13px;font-weight:700">${f.cal}</div>
+              <div style="color:var(--blue);font-size:10px">${f.protein}g P</div>
+            </div>
+          </div>`).join('')}
+        </div>`:
+        sq.length>=1?`
+        <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
+          background:var(--card);border:1px solid var(--border);border-radius:12px;
+          padding:12px 14px;color:var(--muted);font-size:12px">
+          No match for "${sq}"</div>`:''}
+      </div>`}
     </div>`;
   }).join('')}
 
@@ -1132,6 +1163,30 @@ function isPastDate(ddmmyyyy){
   return d < t;
 }
 
+
+function setSlotSearch(idx, val){
+  if(!S.log.slotSearch) S.log.slotSearch={};
+  S.log.slotSearch[idx]=val;
+  reLog();
+}
+
+function pickSearchResult(slotIdx, foodIdx){
+  const foods=S.foods?.foods||FOOD_DB_LOCAL;
+  const meal=S.log.meal;
+  const mealFoods=[
+    ...foods.filter(f=>f.category===meal||f.category==='Anytime'),
+    ...foods.filter(f=>f.category!==meal&&f.category!=='Anytime')
+  ];
+  const sq=(S.log.slotSearch||{})[slotIdx]||'';
+  const filtered=sq.length>0
+    ? mealFoods.filter(f=>f.name.toLowerCase().includes(sq.toLowerCase())).slice(0,6)
+    : [];
+  const food=filtered[foodIdx];
+  if(!food) return;
+  if(!S.log.slotSearch) S.log.slotSearch={};
+  S.log.slotSearch[slotIdx]='';
+  setSlotFood(slotIdx, food.name);
+}
 function setSlotFood(idx, name){
   if(!name) return;
   // Debounce: ignore if same value already set
@@ -1202,6 +1257,7 @@ async function refreshLogData(){
 function setMeal(m){
   S.log.meal=m;
   S.log.items=[null,null,null,null];
+  S.log.slotSearch={};
   reLog();
 }
 
@@ -1261,6 +1317,7 @@ function setSlotQty(idx, val){
 
 function clearSlot(idx){
   if(S.log.items) S.log.items[idx]=null;
+  if(S.log.slotSearch) S.log.slotSearch[idx]='';
   reLog();
 }
 
