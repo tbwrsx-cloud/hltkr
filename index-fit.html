@@ -170,7 +170,7 @@ const FOOD_DB_LOCAL=[
 
 let S={
   screen:"home",dash:null,foods:null,today:null,plan:null,
-  log:{meal:"Breakfast",items:[null,null,null,null],slotSearch:{},search:"",date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})()},
+  log:{meal:"Breakfast",items:[null,null,null,null],search:"",date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})()},
   logDone:false,logResult:null,
   foodFilter:"All",
   metrics:{weight:"",hba1c:"",ldl:"",trig:""},
@@ -181,7 +181,7 @@ let S={
     date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})(),
     doctor:'', cause:'', notes:'',
     symptoms:[{part:'',side:'',type:''},{part:'',side:'',type:''},{part:'',side:'',type:''},{part:'',side:'',type:''},{part:'',side:'',type:''}],
-    medicines:[{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''},{name:'',dose:'',freq:'',duration:''}],
+    medicines:[{name:'',dose:'',freq:'',duration:'',times:[],startDate:''},{name:'',dose:'',freq:'',duration:'',times:[],startDate:''},{name:'',dose:'',freq:'',duration:'',times:[],startDate:''},{name:'',dose:'',freq:'',duration:'',times:[],startDate:''},{name:'',dose:'',freq:'',duration:'',times:[],startDate:''}],
     prescriptionLinks:[], reportLinks:[],
     saving:false, done:false, error:'',
     entries:null, showHistory:false,
@@ -581,54 +581,40 @@ function renderLog(){
     No ${past?'record':'plan'} for ${meal} on ${date.slice(0,5)}
   </div>`}
 
-  <!-- 4 Food slots with search -->
+  <!-- 4 Food slots -->
   <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px">
     ${past?'EDIT RECORD (UP TO 4 ITEMS)':'SET ITEMS (UP TO 4)'}
   </div>
   ${[0,1,2,3].map(i=>{
     const sl=slots[i];
-    const sq=(S.log.slotSearch||{})[i]||'';
-    const filtered=sq.length>0
-      ? mealFoods.filter(f=>f.name.toLowerCase().includes(sq.toLowerCase())).slice(0,6)
-      : [];
-    return`<div style="margin-bottom:12px">
-      ${sl.selected?`
-      <div style="display:flex;gap:8px;align-items:center;padding:10px 12px;
-        border-radius:12px;border:1px solid var(--accent);background:var(--adim)">
-        <div style="flex:1">
-          <div style="color:var(--text);font-size:13px;font-weight:600">${sl.food.name}</div>
-          <div style="color:var(--muted);font-size:10px;margin-top:2px">
-            ${sl.food.cal} kcal &middot; ${sl.food.protein}g P &middot; ${sl.food.portion||''}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-          <div style="color:var(--muted);font-size:9px">QTY</div>
-          <input type="number" min="0.5" step="0.5" value="${sl.qty}"
-            onchange="setSlotQty(${i},this.value)"
-            style="width:52px;padding:6px 4px;border-radius:8px;border:1px solid var(--accent);
-              background:var(--surface);color:var(--accent);font-size:14px;
-              font-weight:700;text-align:center;font-family:inherit;outline:none"/>
-        </div>
-        <button onclick="clearSlot(${i})"
-          style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);
-            background:var(--surface);color:var(--muted);font-size:14px;
-            cursor:pointer;font-family:inherit;line-height:1">&#10005;</button>
+    return`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px">
+      <div style="flex:1">
+        <select onchange="setSlotFood(${i},this.value)"
+          style="width:100%;padding:11px 12px;border-radius:12px;
+            border:1px solid ${sl.selected?'var(--accent)':'var(--border)'};
+            background:var(--card);color:${sl.selected?'var(--text)':'var(--muted)'};
+            font-family:inherit;font-size:13px;outline:none">
+          ${blankOpt}
+          ${mealFoods.map(f=>`<option value="${f.name.trim()}"
+            ${sl.selected.trim()===f.name.trim()?'selected':''}
+            >${f.name.trim()} (${f.cal} kcal)</option>`).join('')}
+        </select>
+        ${sl.food?`<div style="color:var(--muted);font-size:10px;margin-top:3px;padding-left:4px">
+          ${sl.food.cal} kcal &middot; ${sl.food.protein}g protein &middot; ${sl.food.portion||''}
+        </div>`:''}
       </div>
-      `:`
-      <div style="position:relative">
-        <input type="text" placeholder="&#128269; Search food for slot ${i+1}..."
-          value="${sq}"
-          id="slot-input-${i}"
-          oninput="setSlotSearch(${i},this.value)"
-          style="width:100%;padding:11px 14px;border-radius:12px;
-            border:1px solid var(--border);
-            background:var(--card);color:var(--text);
-            font-family:inherit;font-size:13px;outline:none"/>
-        <div id="slot-results-${i}"
-          style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
-            background:var(--card);border:1px solid var(--accent);border-radius:12px;
-            overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
-        </div>
-      </div>`}
+      ${sl.selected?`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px">
+        <div style="color:var(--muted);font-size:9px;letter-spacing:1px">QTY</div>
+        <input type="number" min="0.5" step="0.5" value="${sl.qty}"
+          onchange="setSlotQty(${i},this.value)"
+          style="width:58px;padding:8px 6px;border-radius:10px;border:1px solid var(--accent);
+            background:var(--surface);color:var(--accent);font-size:14px;
+            font-weight:700;text-align:center;font-family:inherit;outline:none"/>
+        <button onclick="clearSlot(${i})"
+          style="width:58px;padding:3px 0;border-radius:8px;border:1px solid var(--border);
+            background:var(--surface);color:var(--muted);font-size:11px;
+            cursor:pointer;font-family:inherit">&#10005; clr</button>
+      </div>`:''}
     </div>`;
   }).join('')}
 
@@ -1146,71 +1132,6 @@ function isPastDate(ddmmyyyy){
   return d < t;
 }
 
-
-function setSlotSearch(idx, val){
-  if(!S.log.slotSearch) S.log.slotSearch={};
-  S.log.slotSearch[idx]=val;
-  // Don't call reLog() - just update the results dropdown in place
-  // so keyboard stays open on Android
-  updateSlotResults(idx, val);
-}
-
-function updateSlotResults(idx, val){
-  const foods=S.foods?.foods||FOOD_DB_LOCAL;
-  const meal=S.log.meal;
-  const mealFoods=[
-    ...foods.filter(f=>f.category===meal||f.category==='Anytime'),
-    ...foods.filter(f=>f.category!==meal&&f.category!=='Anytime')
-  ];
-  const filtered=val.length>0
-    ? mealFoods.filter(f=>f.name.toLowerCase().includes(val.toLowerCase())).slice(0,6)
-    : [];
-
-  const resultsEl=document.getElementById('slot-results-'+idx);
-  if(!resultsEl) return;
-
-  if(filtered.length>0){
-    resultsEl.style.display='block';
-    resultsEl.innerHTML=filtered.map((f,fi)=>`
-    <div onclick="pickSearchResult(${idx},${fi})"
-      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);
-        display:flex;justify-content:space-between;align-items:center">
-      <div style="flex:1">
-        <div style="color:var(--text);font-size:13px">${f.name}</div>
-        <div style="color:var(--muted);font-size:10px">${f.portion||''} &middot; ${f.category}</div>
-      </div>
-      <div style="text-align:right;margin-left:8px">
-        <div style="color:var(--accent);font-size:13px;font-weight:700">${f.cal}</div>
-        <div style="color:var(--blue);font-size:10px">${f.protein}g P</div>
-      </div>
-    </div>`).join('');
-  } else if(val.length>0){
-    resultsEl.style.display='block';
-    resultsEl.innerHTML=`<div style="padding:12px 14px;color:var(--muted);font-size:12px">
-      No match for "${val}"</div>`;
-  } else {
-    resultsEl.style.display='none';
-    resultsEl.innerHTML='';
-  }
-}
-
-function pickSearchResult(slotIdx, foodIdx){
-  const foods=S.foods?.foods||FOOD_DB_LOCAL;
-  const meal=S.log.meal;
-  const mealFoods=[
-    ...foods.filter(f=>f.category===meal||f.category==='Anytime'),
-    ...foods.filter(f=>f.category!==meal&&f.category!=='Anytime')
-  ];
-  const sq=(S.log.slotSearch||{})[slotIdx]||'';
-  const filtered=sq.length>0
-    ? mealFoods.filter(f=>f.name.toLowerCase().includes(sq.toLowerCase())).slice(0,6)
-    : [];
-  const food=filtered[foodIdx];
-  if(!food) return;
-  if(!S.log.slotSearch) S.log.slotSearch={};
-  S.log.slotSearch[slotIdx]='';
-  setSlotFood(slotIdx, food.name);
-}
 function setSlotFood(idx, name){
   if(!name) return;
   // Debounce: ignore if same value already set
@@ -1281,7 +1202,6 @@ async function refreshLogData(){
 function setMeal(m){
   S.log.meal=m;
   S.log.items=[null,null,null,null];
-  S.log.slotSearch={};
   reLog();
 }
 
@@ -1341,7 +1261,6 @@ function setSlotQty(idx, val){
 
 function clearSlot(idx){
   if(S.log.items) S.log.items[idx]=null;
-  if(S.log.slotSearch) S.log.slotSearch[idx]='';
   reLog();
 }
 
@@ -1518,7 +1437,7 @@ async function submitAddFood(){
 async function fetchFitData(days=30){
   if(S.fit.loading) return;
   // Use cache if recent (30 min)
-  if(S.fit.steps!==null && Date.now()-S.fit.lastFetch < 5*60*1000) return; // 5 min cache
+  if(S.fit.steps!==null && Date.now()-S.fit.lastFetch < 30*60*1000) return;
 
   const token = localStorage.getItem('ht_drive_token');
   const expiry = localStorage.getItem('ht_drive_token_expiry');
@@ -1528,9 +1447,8 @@ async function fetchFitData(days=30){
 
   try{
     const now     = new Date();
-    // Use local midnight for bucket boundaries (device timezone = IST)
-    const endOfDay = new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59,999).getTime();
-    const startDay = new Date(now.getFullYear(),now.getMonth(),now.getDate()-(days-1),0,0,0,0).getTime();
+    const endOfDay   = new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59).getTime();
+    const startDay   = new Date(now.getFullYear(),now.getMonth(),now.getDate()-days+1,0,0,0).getTime();
 
     const body = {
       aggregateBy: [
@@ -1842,554 +1760,7 @@ function resetWellnessForm(){
   S.wellness.error='';
   reWellness();
 }
-function reWellness(){
-  const el=document.getElementById('scr');
-  if(el) el.innerHTML=renderWellness();
-}
 
-function renderWellness(){
-  const w=S.wellness;
-  const selectStyle=`width:100%;padding:9px 10px;border-radius:10px;
-    border:1px solid var(--border);background:var(--card);color:var(--text);
-    font-family:inherit;font-size:13px;outline:none;`;
+// ── Medicine Reminders ────────────────────────────────────────
 
-  const optParts=BODY_PARTS.map(p=>`<option value="${p}">${p}</option>`).join('');
-  const optSides=SIDES.map(s=>`<option value="${s}">${s}</option>`).join('');
-  const optSyms=SYMPTOMS.map(s=>`<option value="${s}">${s}</option>`).join('');
-
-  // Symptoms section
-  const symptomsHTML=w.symptoms.map((sym,i)=>`
-  <div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;
-    border:1px solid ${sym.part||sym.type?'var(--accent)':'var(--border)'}">
-    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:8px">
-      SYMPTOM ${i+1}${sym.part&&sym.type?' — '+sym.part+' '+sym.side+' '+sym.type:''}</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-      <select style="${selectStyle}" onchange="S.wellness.symptoms[${i}].part=this.value;reWellness()">
-        <option value="">Body Part</option>${optParts}
-        ${BODY_PARTS.map(p=>`<option value="${p}" ${sym.part===p?'selected':''}>${p}</option>`).join('')}
-      </select>
-      <select style="${selectStyle}" onchange="S.wellness.symptoms[${i}].side=this.value">
-        <option value="">Side</option>
-        ${SIDES.map(s=>`<option value="${s}" ${sym.side===s?'selected':''}>${s}</option>`).join('')}
-      </select>
-      <select style="${selectStyle}" onchange="S.wellness.symptoms[${i}].type=this.value;reWellness()">
-        <option value="">Symptom</option>
-        ${SYMPTOMS.map(s=>`<option value="${s}" ${sym.type===s?'selected':''}>${s}</option>`).join('')}
-      </select>
-    </div>
-  </div>`).join('');
-
-  // Medicines section
-  const medsHTML=w.medicines.map((med,i)=>`
-  <div style="background:var(--surface);border-radius:12px;padding:12px;margin-bottom:8px;
-    border:1px solid ${med.name?'var(--blue)':'var(--border)'}">
-    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:8px">
-      MEDICINE ${i+1}${med.name?' — '+med.name:''}</div>
-    <input type="text" placeholder="Medicine name" value="${med.name}"
-      oninput="S.wellness.medicines[${i}].name=this.value;reWellness()"
-      style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);
-        background:var(--card);color:var(--text);font-family:inherit;font-size:13px;
-        outline:none;margin-bottom:6px"/>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-      <input type="text" placeholder="Dosage (e.g. 1 tab)" value="${med.dose}"
-        oninput="S.wellness.medicines[${i}].dose=this.value"
-        style="${selectStyle}margin-bottom:0"/>
-      <input type="text" placeholder="Frequency" value="${med.freq}"
-        oninput="S.wellness.medicines[${i}].freq=this.value"
-        style="${selectStyle}margin-bottom:0"/>
-      <input type="text" placeholder="Duration" value="${med.duration}"
-        oninput="S.wellness.medicines[${i}].duration=this.value"
-        style="${selectStyle}margin-bottom:0"/>
-    </div>
-  </div>`).join('');
-
-  // History
-  const histHTML=(w.entries||[]).slice(0,10).map(e=>`
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
-    padding:14px;margin-bottom:10px;cursor:pointer"
-    onclick="loadWellnessEntry('${e.date}')">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <span style="color:var(--accent);font-weight:700;font-size:13px">${e.date}</span>
-      ${e.doctor?`<span style="color:var(--muted);font-size:11px">Dr. ${e.doctor}</span>`:''}
-    </div>
-    ${e.symptoms.filter(s=>s.type).map(s=>
-      `<span style="font-size:11px;padding:2px 8px;border-radius:99px;margin-right:4px;
-        background:rgba(255,107,53,0.15);color:var(--orange)">${s.part} ${s.side} ${s.type}</span>`
-    ).join('')}
-    ${e.medicines.filter(m=>m.name).length?`
-    <div style="color:var(--muted);font-size:11px;margin-top:6px">
-      💊 ${e.medicines.filter(m=>m.name).map(m=>m.name).join(', ')}</div>`:''}
-  </div>`).join('');
-
-  return`<div class="pad" style="padding-bottom:100px">
-  <div style="font-size:22px;font-weight:800;margin-bottom:4px">Wellness</div>
-  <div style="color:var(--muted);font-size:12px;margin-bottom:16px">Track symptoms, doctor visits & medicines</div>
-
-  <!-- Toggle form/history -->
-  <div style="display:flex;gap:8px;margin-bottom:16px">
-    <button onclick="resetWellnessForm()"
-      style="flex:1;padding:10px;border-radius:12px;border:none;cursor:pointer;font-family:inherit;
-        font-size:13px;font-weight:${!w.showHistory?700:400};
-        background:${!w.showHistory?'var(--accent)':'var(--card)'};
-        color:${!w.showHistory?'#0A0F1E':'var(--muted)'}">
-      + New Entry</button>
-    <button onclick="S.wellness.showHistory=true;S.wellness.entries=null;loadWellness().then(reWellness)"
-      style="flex:1;padding:10px;border-radius:12px;border:none;cursor:pointer;font-family:inherit;
-        font-size:13px;font-weight:${w.showHistory?700:400};
-        background:${w.showHistory?'var(--accent)':'var(--card)'};
-        color:${w.showHistory?'#0A0F1E':'var(--muted)'}">
-      History</button>
-  </div>
-
-  ${w.showHistory?`
-  <!-- History view -->
-  <div>
-    ${histHTML||'<div style="color:var(--muted);text-align:center;padding:40px 0">No wellness entries yet</div>'}
-  </div>
-  `:` 
-  <!-- New entry form -->
-
-  ${w.done?`<div style="background:var(--adim);border:1px solid var(--accent);border-radius:14px;
-    padding:14px;margin-bottom:16px">
-    <div style="color:var(--accent);font-weight:700">&#10003; Wellness entry saved!</div>
-    <div style="color:var(--muted);font-size:12px;margin-top:4px">${w.date}</div>
-  </div>`:''}
-
-  <!-- Date -->
-  <div style="margin-bottom:16px">
-    <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:6px">DATE</div>
-    <input type="date" value="${dateToISO(w.date)}" onchange="S.wellness.date=isoToDate(this.value)"
-      style="width:100%;padding:12px 16px;border-radius:14px;border:1px solid var(--border);
-        background:var(--card);color:var(--text);font-family:inherit;font-size:15px;
-        font-weight:600;outline:none"/>
-  </div>
-
-  <!-- Doctor & Cause -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-    <div>
-      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:6px">DOCTOR CONSULTED</div>
-      <input type="text" placeholder="Dr. Name" value="${w.doctor}"
-        oninput="S.wellness.doctor=this.value"
-        style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
-          background:var(--card);color:var(--text);font-family:inherit;font-size:13px;outline:none"/>
-    </div>
-    <div>
-      <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:6px">CAUSE</div>
-      <input type="text" placeholder="e.g. Infection" value="${w.cause}"
-        oninput="S.wellness.cause=this.value"
-        style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
-          background:var(--card);color:var(--text);font-family:inherit;font-size:13px;outline:none"/>
-    </div>
-  </div>
-
-  <!-- Symptoms -->
-  <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px">SYMPTOMS (UP TO 5)</div>
-  ${symptomsHTML}
-
-  <!-- Medicines -->
-  <div style="color:var(--muted);font-size:10px;letter-spacing:2px;margin-bottom:10px;margin-top:6px">MEDICINES (UP TO 5)</div>
-  ${medsHTML}
-
-  <!-- Notes -->
-  <div style="margin-bottom:16px">
-    <div style="color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:6px">NOTES</div>
-    <textarea placeholder="Additional notes..." rows="3"
-      oninput="S.wellness.notes=this.value"
-      style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
-        background:var(--card);color:var(--text);font-family:inherit;font-size:13px;
-        outline:none;resize:none">${w.notes}</textarea>
-  </div>
-
-  <!-- File uploads -->
-  ${['prescription','report'].map(type=>{
-    const icon=type==='prescription'?'📋':'🔬';
-    const label=type==='prescription'?'Prescription':'Test Report';
-    const links=type==='prescription'?w.prescriptionLinks:w.reportLinks;
-    return`<div style="background:var(--card);border:1px solid var(--border);
-      border-radius:14px;padding:14px;margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:20px">${icon}</span>
-          <span style="color:var(--text);font-size:14px;font-weight:600">${label}</span>
-          ${links.length?`<span style="background:var(--adim);color:var(--accent);
-            font-size:10px;padding:2px 8px;border-radius:99px;font-weight:700">
-            ${links.length} file${links.length>1?'s':''}</span>`:''}
-        </div>
-        <label style="padding:7px 14px;border-radius:10px;cursor:pointer;
-          background:var(--accent);border:none;color:#0A0F1E;
-          font-size:12px;font-weight:700;font-family:inherit">
-          + Add
-          <input type="file" accept="image/*,.pdf" multiple style="display:none"
-            onchange="handleMultiFileUpload(this,'${type}')"/>
-        </label>
-      </div>
-      <div id="upload-status-${type}" style="color:var(--muted);font-size:11px;margin-bottom:6px"></div>
-      ${links.length?`<div style="display:flex;flex-direction:column;gap:6px">
-        ${links.map((link,i)=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;
-          padding:8px 10px;background:var(--surface);border-radius:10px;
-          border:1px solid var(--border)">
-          <a href="${link.url}" target="_blank"
-            style="color:var(--accent);font-size:12px;text-decoration:none;flex:1;
-              overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            &#128279; ${link.name||'File '+(i+1)}
-          </a>
-          <button onclick="removeUploadedFile('${type}',${i})"
-            style="background:none;border:none;color:var(--muted);cursor:pointer;
-              font-size:14px;padding:0 4px;flex-shrink:0">&#10005;</button>
-        </div>`).join('')}
-      </div>`:'<div style="color:var(--muted);font-size:11px">No files uploaded yet</div>'}
-    </div>`;
-  }).join('')}
-
-  ${w.error?`<div style="color:var(--danger);font-size:13px;margin-bottom:12px">&#10007; ${w.error}</div>`:''}
-  `}
-  </div>
-
-  <!-- Save bar -->
-  ${!w.showHistory?`<div class="logbar">
-    <div>
-      <div style="color:var(--accent);font-weight:800;font-size:16px">Wellness Log</div>
-      <div style="color:var(--muted);font-size:11px">${w.date}</div>
-    </div>
-    <button onclick="submitWellness()" ${w.saving?'disabled':''}
-      style="background:var(--accent);border:none;border-radius:12px;
-        padding:11px 22px;color:#0A0F1E;font-weight:800;font-size:14px;
-        cursor:pointer;font-family:inherit">
-      ${w.saving?'Saving...':'Save &#8594;'}</button>
-  </div>`:''}`;
-}
-
-function loadWellnessEntry(date){
-  const entry=S.wellness.entries?.find(e=>e.date===date);
-  if(!entry) return;
-  // Pad arrays to 5
-  const syms=[...entry.symptoms];
-  while(syms.length<5) syms.push({part:'',side:'',type:''});
-  const meds=[...entry.medicines];
-  while(meds.length<5) meds.push({name:'',dose:'',freq:'',duration:''});
-  S.wellness={
-    ...S.wellness,
-    date:entry.date, doctor:entry.doctor, cause:entry.cause,
-    notes:entry.notes, symptoms:syms, medicines:meds,
-    prescriptionLinks:entry.prescriptionLinks||[],
-    reportLinks:entry.reportLinks||[],
-    showHistory:false, done:false, error:''
-  };
-  reWellness();
-}
-
-async function submitWellness(){
-  const w=S.wellness;
-  const hasSymptom=w.symptoms.some(s=>s.type);
-  if(!hasSymptom && !w.doctor && !w.cause){
-    S.wellness.error='Please add at least one symptom or doctor/cause';
-    reWellness(); return;
-  }
-  S.wellness.saving=true; S.wellness.error=''; reWellness();
-  if(isSetup()){
-    S.wellness.saving=false; S.wellness.done=true;
-    S.wellness.entries=null; reWellness(); return;
-  }
-  try{
-    const r=await api('logWellness',{
-      date:w.date, doctor:w.doctor, cause:w.cause, notes:w.notes,
-      symptoms:w.symptoms, medicines:w.medicines,
-      prescriptionLinks:w.prescriptionLinks, reportLinks:w.reportLinks
-    });
-    if(r&&r.success){
-      S.wellness.saving=false; S.wellness.done=true;
-      S.wellness.entries=null; // force refresh
-      // Reset form for next entry
-      setTimeout(()=>{
-        S.wellness={
-          ...S.wellness,
-          date:(function(){const n=new Date();return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear();})(),
-          doctor:'',cause:'',notes:'',
-          symptoms:Array(5).fill(null).map(()=>({part:'',side:'',type:''})),
-          medicines:Array(5).fill(null).map(()=>({name:'',dose:'',freq:'',duration:''})),
-          prescriptionLinks:[],reportLinks:[],done:false
-        };
-        reWellness();
-      },2000);
-    } else {
-      S.wellness.saving=false;
-      S.wellness.error=r?.error||'Save failed';
-      reWellness();
-    }
-  }catch(e){
-    S.wellness.saving=false;
-    S.wellness.error='Error: '+e.message;
-    reWellness();
-  }
-}
-
-// ── Chart builders ───────────────────────────────────────────
-const CG="#1E2A45",CT="#6B7A9F";
-const cOpts={responsive:true,maintainAspectRatio:false,
-  plugins:{legend:{display:false}},
-  scales:{x:{grid:{color:CG},ticks:{color:CT,font:{size:9},maxRotation:0}},
-          y:{grid:{color:CG},ticks:{color:CT,font:{size:9}}}}};
-
-function getActuals(){return(S.dash?.actuals||[]).filter(a=>a.kcalIn>0);}
-
-function killCharts(){Object.values(S.charts).forEach(c=>{try{c.destroy()}catch(e){}});S.charts={};}
-
-function buildSparkline(){
-  const ctx=document.getElementById("sparkChart");if(!ctx)return;
-  const a=getActuals();
-  S.charts.spark=new Chart(ctx,{type:"line",data:{
-    labels:a.map(d=>d.date.slice(0,5)),
-    datasets:[{data:a.map(d=>d.kcalIn),borderColor:"#00E5A0",
-      backgroundColor:"rgba(0,229,160,0.07)",borderWidth:2,pointRadius:0,fill:true,tension:0.4}]
-  },options:{responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{display:false},tooltip:{enabled:false}},
-    scales:{x:{display:false},y:{display:false}}}});
-}
-function buildCalChart(){
-  const ctx=document.getElementById("calChart");if(!ctx)return;
-  const a=getActuals();
-  S.charts.cal=new Chart(ctx,{type:"line",data:{
-    labels:a.map(d=>d.date.slice(0,5)),
-    datasets:[{label:"kcal",data:a.map(d=>d.kcalIn),borderColor:"#00E5A0",
-      backgroundColor:"rgba(0,229,160,0.08)",borderWidth:2.5,
-      pointRadius:3,pointBackgroundColor:"#00E5A0",fill:true,tension:0.4}]
-  },options:{...cOpts}});
-}
-function buildProtChart(){
-  const ctx=document.getElementById("protChart");if(!ctx)return;
-  const a=getActuals();
-  S.charts.prot=new Chart(ctx,{type:"line",data:{
-    labels:a.map(d=>d.date.slice(0,5)),
-    datasets:[{label:"protein (g)",data:a.map(d=>d.protein),borderColor:"#4A9FFF",
-      backgroundColor:"rgba(74,159,255,0.08)",borderWidth:2.5,
-      pointRadius:3,pointBackgroundColor:"#4A9FFF",fill:true,tension:0.4}]
-  },options:{...cOpts}});
-}
-function buildBarChart(){
-  const ctx=document.getElementById("barChart");if(!ctx)return;
-  const a=getActuals();
-  S.charts.bar=new Chart(ctx,{type:"bar",data:{
-    labels:a.map(d=>d.date.slice(0,5)),
-    datasets:[
-      {label:"kcal",data:a.map(d=>d.kcalIn),backgroundColor:"rgba(0,229,160,0.7)",borderRadius:4},
-      {label:"protein (g)",data:a.map(d=>d.protein),backgroundColor:"rgba(74,159,255,0.7)",borderRadius:4},
-    ]
-  },options:{...cOpts,plugins:{legend:{labels:{color:CT,font:{size:10}}}}}});
-}
-
-
-function buildWellnessChart(){
-  const ctx=document.getElementById("wellnessChart");if(!ctx)return;
-  const entries=S.wellness?.entries||[];
-  const monthCounts={};
-  entries.forEach(e=>{
-    if(!e.date) return;
-    const p=e.date.split('/');
-    if(p.length!==3) return;
-    const key=p[2]+'-'+p[1];
-    const label=new Date(parseInt(p[2]),parseInt(p[1])-1,1)
-      .toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
-    if(!monthCounts[key]) monthCounts[key]={key,label,count:0};
-    monthCounts[key].count++;
-  });
-  const sorted=Object.values(monthCounts).sort((a,b)=>a.key.localeCompare(b.key));
-  if(!sorted.length) return;
-  S.charts.wellness=new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels:sorted.map(m=>m.label),
-      datasets:[{
-        label:'Events',
-        data:sorted.map(m=>m.count),
-        backgroundColor:sorted.map(m=>m.count>=3?'rgba(255,107,53,0.8)':
-          m.count===2?'rgba(255,184,48,0.8)':'rgba(74,159,255,0.7)'),
-        borderRadius:6,
-        borderSkipped:false
-      }]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{callbacks:{
-          label:ctx=>`${ctx.raw} wellness event${ctx.raw!==1?'s':''}`
-        }}
-      },
-      scales:{
-        x:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:10}}},
-        y:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:10},
-          stepSize:1,precision:0},min:0}
-      }
-    }
-  });
-}
-
-function buildStepsChart(){
-  const ctx=document.getElementById("stepsChart");if(!ctx)return;
-  const all=S.fit.daily||[];
-  const daily=all.slice(-7); // last 7 days only
-  if(!daily.length) return;
-  if(S.charts.steps){try{S.charts.steps.destroy();}catch(e){}}
-  S.charts.steps=new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels:daily.map(d=>d.date),
-      datasets:[{
-        label:'Steps',
-        data:daily.map(d=>d.steps),
-        backgroundColor:daily.map(d=>d.steps>=10000?'rgba(0,229,160,0.8)':
-          d.steps>=5000?'rgba(74,159,255,0.7)':'rgba(167,139,250,0.6)'),
-        borderRadius:6,
-        borderSkipped:false
-      }]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{callbacks:{
-          label:c=>`${c.raw.toLocaleString()} steps`+
-            (c.raw>=10000?' 🎯':'')
-        }}
-      },
-      scales:{
-        x:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:9},maxRotation:0}},
-        y:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:9},
-          callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v},min:0}
-      },
-      annotation:{annotations:{
-        goal:{type:'line',yMin:10000,yMax:10000,
-          borderColor:'rgba(0,229,160,0.4)',borderDash:[5,5]}
-      }}
-    }
-  });
-}
-
-function buildCalsBurnedChart(){
-  const ctx=document.getElementById("calsBurnedChart");if(!ctx)return;
-  const all2=S.fit.daily||[];
-  const daily=all2.slice(-7);
-  if(!daily.length) return;
-  if(S.charts.calsBurned){try{S.charts.calsBurned.destroy();}catch(e){}}
-  S.charts.calsBurned=new Chart(ctx,{
-    type:'line',
-    data:{
-      labels:daily.map(d=>d.date),
-      datasets:[{
-        label:'kcal burned',
-        data:daily.map(d=>d.calories),
-        borderColor:'#FF6B35',
-        backgroundColor:'rgba(255,107,53,0.08)',
-        borderWidth:2.5,
-        pointRadius:3,
-        pointBackgroundColor:'#FF6B35',
-        fill:true,
-        tension:0.4
-      }]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{
-        x:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:9},maxRotation:0}},
-        y:{grid:{color:'#1E2A45'},ticks:{color:'#6B7A9F',font:{size:9}},min:0}
-      }
-    }
-  });
-}
-// ── App Init ─────────────────────────────────────────────────
-(function(){
-  var s=document.createElement('script');
-  s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-  s.async=true;
-  s.onload=function(){
-    const oauthReturn=handleOAuthReturn();
-    if(!API) showSetupPopup();
-    else if(oauthReturn) _go('wellness');
-    else _go(window._qNav||'home');
-  };
-  s.onerror=function(){
-    if(!API) showSetupPopup();
-    else _go(window._qNav||'home');
-  };
-  document.head.appendChild(s);
-})();
-
-// Inject font non-blocking
-(function(){
-  var l=document.createElement('link');
-  l.rel='stylesheet';
-  l.href='https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap';
-  document.head.appendChild(l);
-})();
-
-if("serviceWorker" in navigator){
-  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
-}
-</script>
-
-<!-- Setup Popup -->
-<div id="setup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);
-  z-index:999;align-items:center;justify-content:center;padding:24px;">
-  <div style="background:#161D2F;border:1px solid #1E2A45;border-radius:24px;
-    padding:28px 24px;width:100%;max-width:390px;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
-    <div style="font-size:36px;text-align:center;margin-bottom:16px">&#9881;&#65039;</div>
-    <div style="font-size:20px;font-weight:800;color:#F0F4FF;text-align:center;margin-bottom:8px">
-      Connect Your Drive</div>
-    <div style="font-size:13px;color:#6B7A9F;text-align:center;line-height:1.6;margin-bottom:24px">
-      Paste your Google Apps Script Web App URL below.<br/>
-      <span style="color:#00E5A0">script.google.com</span> &rarr; Deploy &rarr; Web App &rarr; Copy URL
-    </div>
-    <input id="api-url-input" type="url"
-      placeholder="https://script.google.com/macros/s/..."
-      style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid #1E2A45;
-        background:#111827;color:#F0F4FF;font-size:13px;font-family:inherit;
-        outline:none;margin-bottom:8px"
-      onkeydown="if(event.key==='Enter')saveApiUrl()"/>
-    <div id="url-error" style="color:#FF4757;font-size:12px;margin-bottom:12px;display:none">
-      Please enter a valid Apps Script URL</div>
-    <button onclick="saveApiUrl()" style="width:100%;padding:15px;border-radius:14px;border:none;
-      background:linear-gradient(135deg,#00E5A0,#00C98A);color:#0A0F1E;font-weight:800;
-      font-size:15px;cursor:pointer;font-family:inherit;margin-bottom:12px">
-      Connect &rarr;
-    </button>
-    <button onclick="skipSetup()" style="width:100%;padding:12px;border-radius:14px;border:none;
-      background:transparent;color:#6B7A9F;font-size:13px;cursor:pointer;font-family:inherit">
-      Skip &mdash; use sample data
-    </button>
-  </div>
-</div>
-
-<script>
-function showSetupPopup(){
-  var el=document.getElementById('setup-overlay');
-  el.style.display='flex';
-  setTimeout(function(){document.getElementById('api-url-input').focus();},100);
-}
-function saveApiUrl(){
-  var val=document.getElementById('api-url-input').value.trim();
-  var err=document.getElementById('url-error');
-  if(!val||!val.startsWith('https://script.google.com')){
-    err.style.display='block'; return;
-  }
-  err.style.display='none';
-  API=val;
-  localStorage.setItem('ht_api_url',val);
-  sessionStorage.setItem('ht_api_url',val);
-  document.getElementById('setup-overlay').style.display='none';
-  _go('home');
-}
-function skipSetup(){
-  document.getElementById('setup-overlay').style.display='none';
-  _go('home');
-}
-function resetApiUrl(){
-  localStorage.removeItem('ht_api_url');
-  sessionStorage.removeItem('ht_api_url');
-  API='';
-  showSetupPopup();
-}
-</script>
-</body>
-</html>
+>
