@@ -205,7 +205,7 @@ async function api(action,body){
   if(!API) API=localStorage.getItem('ht_api_url')||sessionStorage.getItem('ht_api_url')||'';
   if(isSetup()) return null;
   const url=`${API}?action=${action}`;
-  const r=await fetch(url,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{method:"GET"});
+  const r=await fetch(url,body?{method:"POST",body:JSON.stringify(body)}:{method:"GET"});
   return r.json();
 }
 
@@ -1325,7 +1325,7 @@ async function submitLog(){
     result={mealType:meal,totalCal,totalProtein,dayKcal:totalCal,dayProt:totalProtein};
   } else {
     try{
-      console.log('[LOG] Sending logMeal:', {date:S.log.date, meal, items:validItems.length});
+      console.log('[LOG] Sending logMeal:',{date:S.log.date,meal,items:validItems.length});
       result=await api('logMeal',{
         date:S.log.date,
         dayName:getDay(S.log.date),
@@ -1336,27 +1336,21 @@ async function submitLog(){
         overwrite:true
       });
     }catch(e){
-      // Real error - show it, don't fake success
       S.lastSave={mealType:meal,totalCal,totalProtein,dayKcal:0,dayProt:0,
         error:'Save failed: '+e.message,ts:Date.now()};
       S.log.items=[null,null,null,null];
-      S.log.slotSearch={};
       reLog();
       return;
     }
   }
 
-  console.log('[LOG] logMeal result:', JSON.stringify(result));
-  // Check if Apps Script returned an error
-  if(result && result.error){
-    S.lastSave={mealType:meal,totalCal,totalProtein,dayKcal:0,dayProt:0,
-      error:'Sheets error: '+result.error,ts:Date.now()};
+  console.log('[LOG] logMeal result:',JSON.stringify(result));
+  if(result&&result.error){
+    S.lastSave={mealType:meal,totalCal,totalProtein,dayKcal:0,dayProt:0,error:'Sheets error: '+result.error,ts:Date.now()};
     S.log.items=[null,null,null,null];
-    S.log.slotSearch={};
     reLog();
     return;
   }
-
   // Store last save result for toast
   S.lastSave={
     mealType:meal,
